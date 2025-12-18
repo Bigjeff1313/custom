@@ -1,5 +1,7 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Check, Star, Sparkles } from "lucide-react";
+import CreateLinkModal from "./CreateLinkModal";
 
 const pricingPlans = [
   {
@@ -41,7 +43,21 @@ const cryptos = [
 ];
 
 const PricingSection = () => {
+  const [modalOpen, setModalOpen] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState<"basic" | "pro">("basic");
+
+  const handleGetStarted = (planName: string) => {
+    setSelectedPlan(planName === "Pro Link" ? "pro" : "basic");
+    setModalOpen(true);
+  };
+
   return (
+    <>
+      <CreateLinkModal
+        open={modalOpen}
+        onOpenChange={setModalOpen}
+        planType={selectedPlan}
+      />
     <section id="pricing" className="py-24 relative">
       {/* Background Effect */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-gradient-radial from-primary/5 via-transparent to-transparent blur-3xl" />
@@ -101,7 +117,7 @@ const PricingSection = () => {
                 ))}
               </ul>
 
-              <Button variant="pricing" size="lg">
+              <Button variant="pricing" size="lg" onClick={() => handleGetStarted(plan.name)}>
                 Get Started
               </Button>
             </div>
@@ -128,6 +144,7 @@ const PricingSection = () => {
         </div>
       </div>
     </section>
+    </>
   );
 };
 
