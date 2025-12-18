@@ -14,7 +14,113 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      crypto_wallets: {
+        Row: {
+          created_at: string
+          currency: string
+          id: string
+          is_active: boolean | null
+          wallet_address: string
+        }
+        Insert: {
+          created_at?: string
+          currency: string
+          id?: string
+          is_active?: boolean | null
+          wallet_address: string
+        }
+        Update: {
+          created_at?: string
+          currency?: string
+          id?: string
+          is_active?: boolean | null
+          wallet_address?: string
+        }
+        Relationships: []
+      }
+      links: {
+        Row: {
+          click_count: number | null
+          created_at: string
+          custom_domain: string | null
+          id: string
+          original_url: string
+          plan_type: string
+          short_code: string
+          status: Database["public"]["Enums"]["link_status"]
+          updated_at: string
+        }
+        Insert: {
+          click_count?: number | null
+          created_at?: string
+          custom_domain?: string | null
+          id?: string
+          original_url: string
+          plan_type?: string
+          short_code: string
+          status?: Database["public"]["Enums"]["link_status"]
+          updated_at?: string
+        }
+        Update: {
+          click_count?: number | null
+          created_at?: string
+          custom_domain?: string | null
+          id?: string
+          original_url?: string
+          plan_type?: string
+          short_code?: string
+          status?: Database["public"]["Enums"]["link_status"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      payments: {
+        Row: {
+          amount: number
+          created_at: string
+          currency: string
+          expires_at: string
+          id: string
+          link_id: string | null
+          status: Database["public"]["Enums"]["payment_status"]
+          transaction_hash: string | null
+          updated_at: string
+          wallet_address: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          currency: string
+          expires_at: string
+          id?: string
+          link_id?: string | null
+          status?: Database["public"]["Enums"]["payment_status"]
+          transaction_hash?: string | null
+          updated_at?: string
+          wallet_address: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          currency?: string
+          expires_at?: string
+          id?: string
+          link_id?: string | null
+          status?: Database["public"]["Enums"]["payment_status"]
+          transaction_hash?: string | null
+          updated_at?: string
+          wallet_address?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_link_id_fkey"
+            columns: ["link_id"]
+            isOneToOne: false
+            referencedRelation: "links"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -23,7 +129,8 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      link_status: "pending_payment" | "active" | "expired"
+      payment_status: "pending" | "confirmed" | "expired"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +257,9 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      link_status: ["pending_payment", "active", "expired"],
+      payment_status: ["pending", "confirmed", "expired"],
+    },
   },
 } as const
