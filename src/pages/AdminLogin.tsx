@@ -34,31 +34,6 @@ const AdminLogin = () => {
     }
   };
 
-  const handleSignup = async () => {
-    if (!email || !password) {
-      toast.error("Please enter email and password");
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/admin`,
-        },
-      });
-
-      if (error) throw error;
-
-      toast.success("Account created! You can now login.");
-    } catch (error: any) {
-      toast.error(error.message || "Signup failed");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
@@ -102,15 +77,6 @@ const AdminLogin = () => {
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Login"}
           </Button>
 
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={handleSignup}
-            disabled={loading}
-            className="w-full text-muted-foreground hover:text-foreground"
-          >
-            Create Admin Account
-          </Button>
         </form>
 
         <div className="mt-6 text-center">

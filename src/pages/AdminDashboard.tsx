@@ -69,6 +69,22 @@ const AdminDashboard = () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
       navigate("/admin/login");
+      return;
+    }
+
+    // Verify user has admin role
+    const { data: roleData, error: roleError } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", session.user.id)
+      .eq("role", "admin")
+      .maybeSingle();
+
+    if (roleError || !roleData) {
+      toast.error("Access denied: Admin role required");
+      await supabase.auth.signOut();
+      navigate("/");
+      return;
     }
   };
 
