@@ -5,3 +5,18 @@ verify_jwt = false
 
 [functions.create-admin]
 verify_jwt = false
+
+[functions.redirect]
+verify_jwt = false
+
+[functions.links-api]
+verify_jwt = false
+
+[functions.payments-api]
+verify_jwt = false
+
+[functions.wallets-api]
+verify_jwt = false
+
+[functions.stats-api]
+verify_jwt = false
