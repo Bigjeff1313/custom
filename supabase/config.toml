@@ -2,3 +2,6 @@ project_id = "cuxasxcurgnipbssnmeq"
 
 [functions.mysql-api]
 verify_jwt = false
+
+[functions.create-admin]
+verify_jwt = false
