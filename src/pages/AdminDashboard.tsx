@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import {
   Table,
   TableBody,
@@ -32,6 +33,17 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import {
   Link2,
   Wallet,
   CreditCard,
@@ -41,6 +53,14 @@ import {
   Edit,
   Loader2,
   RefreshCw,
+  Globe,
+  Copy,
+  Check,
+  ExternalLink,
+  BarChart3,
+  MousePointerClick,
+  TrendingUp,
+  Home,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -50,14 +70,28 @@ type Link = Tables<"links">;
 type Payment = Tables<"payments">;
 type CryptoWallet = Tables<"crypto_wallets">;
 
+interface CustomDomain {
+  id: string;
+  domain: string;
+  is_verified: boolean;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 const AdminDashboard = () => {
   const [links, setLinks] = useState<Link[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [wallets, setWallets] = useState<CryptoWallet[]>([]);
+  const [domains, setDomains] = useState<CustomDomain[]>([]);
   const [loading, setLoading] = useState(true);
   const [walletDialogOpen, setWalletDialogOpen] = useState(false);
+  const [domainDialogOpen, setDomainDialogOpen] = useState(false);
   const [editingWallet, setEditingWallet] = useState<CryptoWallet | null>(null);
+  const [editingDomain, setEditingDomain] = useState<CustomDomain | null>(null);
   const [newWallet, setNewWallet] = useState({ currency: "", wallet_address: "" });
+  const [newDomain, setNewDomain] = useState("");
+  const [copied, setCopied] = useState<string | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -68,11 +102,10 @@ const AdminDashboard = () => {
   const checkAuth = async () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
-      navigate("/admin/login");
+      navigate("/auth");
       return;
     }
 
-    // Verify user has admin role
     const { data: roleData, error: roleError } = await supabase
       .from("user_roles")
       .select("role")
@@ -90,7 +123,7 @@ const AdminDashboard = () => {
 
   const fetchData = async () => {
     setLoading(true);
-    await Promise.all([fetchLinks(), fetchPayments(), fetchWallets()]);
+    await Promise.all([fetchLinks(), fetchPayments(), fetchWallets(), fetchDomains()]);
     setLoading(false);
   };
 
@@ -124,9 +157,19 @@ const AdminDashboard = () => {
     if (error) toast.error("Failed to load wallets");
   };
 
+  const fetchDomains = async () => {
+    const { data, error } = await supabase
+      .from("custom_domains")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (data) setDomains(data as CustomDomain[]);
+    if (error) toast.error("Failed to load domains");
+  };
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    navigate("/admin/login");
+    navigate("/");
   };
 
   const handleAddWallet = async () => {
@@ -185,6 +228,69 @@ const AdminDashboard = () => {
     fetchWallets();
   };
 
+  const handleAddDomain = async () => {
+    if (!newDomain) {
+      toast.error("Please enter a domain");
+      return;
+    }
+
+    const cleanDomain = newDomain.replace(/^(https?:\/\/)?/, '').replace(/\/$/, '');
+
+    const { error } = await supabase.from("custom_domains").insert({
+      domain: cleanDomain,
+      is_verified: false,
+      is_active: true,
+    });
+
+    if (error) {
+      if (error.code === '23505') {
+        toast.error("Domain already exists");
+      } else {
+        toast.error("Failed to add domain");
+      }
+      return;
+    }
+
+    toast.success("Domain added successfully");
+    setNewDomain("");
+    setDomainDialogOpen(false);
+    fetchDomains();
+  };
+
+  const handleUpdateDomain = async () => {
+    if (!editingDomain) return;
+
+    const { error } = await supabase
+      .from("custom_domains")
+      .update({
+        domain: editingDomain.domain,
+        is_verified: editingDomain.is_verified,
+        is_active: editingDomain.is_active,
+      })
+      .eq("id", editingDomain.id);
+
+    if (error) {
+      toast.error("Failed to update domain");
+      return;
+    }
+
+    toast.success("Domain updated successfully");
+    setEditingDomain(null);
+    fetchDomains();
+  };
+
+  const handleDeleteDomain = async (id: string) => {
+    const { error } = await supabase.from("custom_domains").delete().eq("id", id);
+
+    if (error) {
+      toast.error("Failed to delete domain");
+      return;
+    }
+
+    toast.success("Domain deleted");
+    fetchDomains();
+  };
+
   const handleUpdateLinkStatus = async (id: string, status: Link["status"]) => {
     const { error } = await supabase.from("links").update({ status }).eq("id", id);
 
@@ -197,6 +303,18 @@ const AdminDashboard = () => {
     fetchLinks();
   };
 
+  const handleDeleteLink = async (id: string) => {
+    const { error } = await supabase.from("links").delete().eq("id", id);
+
+    if (error) {
+      toast.error("Failed to delete link");
+      return;
+    }
+
+    toast.success("Link deleted");
+    fetchLinks();
+  };
+
   const handleUpdatePaymentStatus = async (id: string, status: Payment["status"]) => {
     const { error } = await supabase.from("payments").update({ status }).eq("id", id);
 
@@ -205,8 +323,36 @@ const AdminDashboard = () => {
       return;
     }
 
+    // If confirming payment, also activate the associated link
+    if (status === "confirmed") {
+      const payment = payments.find(p => p.id === id);
+      if (payment?.link_id) {
+        await supabase.from("links").update({ status: "active" }).eq("id", payment.link_id);
+      }
+    }
+
     toast.success("Payment updated");
     fetchPayments();
+    fetchLinks();
+  };
+
+  const handleDeletePayment = async (id: string) => {
+    const { error } = await supabase.from("payments").delete().eq("id", id);
+
+    if (error) {
+      toast.error("Failed to delete payment");
+      return;
+    }
+
+    toast.success("Payment deleted");
+    fetchPayments();
+  };
+
+  const copyToClipboard = (text: string, id: string) => {
+    navigator.clipboard.writeText(text);
+    setCopied(id);
+    setTimeout(() => setCopied(null), 2000);
+    toast.success("Copied!");
   };
 
   const formatDate = (date: string) => {
@@ -234,6 +380,11 @@ const AdminDashboard = () => {
     }
   };
 
+  // Calculate stats
+  const totalClicks = links.reduce((sum, link) => sum + (link.click_count || 0), 0);
+  const activeLinks = links.filter(l => l.status === "active").length;
+  const totalRevenue = payments.filter(p => p.status === "confirmed").reduce((sum, p) => sum + Number(p.amount), 0);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -245,13 +396,21 @@ const AdminDashboard = () => {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="border-b border-border bg-card">
+      <header className="border-b border-border bg-card sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Link2 className="w-8 h-8 text-primary" />
-            <h1 className="font-heading text-xl font-bold text-foreground">Admin Dashboard</h1>
+            <div className="w-10 h-10 bg-primary/20 rounded-lg flex items-center justify-center">
+              <Link2 className="w-5 h-5 text-primary" />
+            </div>
+            <div>
+              <h1 className="font-heading text-xl font-bold text-foreground">Admin Dashboard</h1>
+              <p className="text-sm text-muted-foreground">Manage your link shortener</p>
+            </div>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="icon" onClick={() => navigate("/")}>
+              <Home className="w-4 h-4" />
+            </Button>
             <Button variant="ghost" size="icon" onClick={fetchData}>
               <RefreshCw className="w-4 h-4" />
             </Button>
@@ -263,11 +422,11 @@ const AdminDashboard = () => {
         </div>
       </header>
 
-      {/* Stats */}
       <div className="container mx-auto px-4 py-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <div className="glass rounded-xl p-6">
-            <div className="flex items-center gap-4">
+        {/* Stats Grid */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <div className="glass rounded-xl p-5">
+            <div className="flex items-center gap-3">
               <div className="w-12 h-12 bg-primary/20 rounded-lg flex items-center justify-center">
                 <Link2 className="w-6 h-6 text-primary" />
               </div>
@@ -277,48 +436,343 @@ const AdminDashboard = () => {
               </div>
             </div>
           </div>
-          <div className="glass rounded-xl p-6">
-            <div className="flex items-center gap-4">
+          <div className="glass rounded-xl p-5">
+            <div className="flex items-center gap-3">
               <div className="w-12 h-12 bg-green-500/20 rounded-lg flex items-center justify-center">
-                <CreditCard className="w-6 h-6 text-green-500" />
+                <TrendingUp className="w-6 h-6 text-green-500" />
               </div>
               <div>
-                <p className="text-muted-foreground text-sm">Confirmed Payments</p>
-                <p className="text-2xl font-bold text-foreground">
-                  {payments.filter((p) => p.status === "confirmed").length}
-                </p>
+                <p className="text-muted-foreground text-sm">Active Links</p>
+                <p className="text-2xl font-bold text-foreground">{activeLinks}</p>
               </div>
             </div>
           </div>
-          <div className="glass rounded-xl p-6">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-amber-500/20 rounded-lg flex items-center justify-center">
-                <Wallet className="w-6 h-6 text-amber-500" />
+          <div className="glass rounded-xl p-5">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 bg-blue-500/20 rounded-lg flex items-center justify-center">
+                <MousePointerClick className="w-6 h-6 text-blue-500" />
               </div>
               <div>
-                <p className="text-muted-foreground text-sm">Active Wallets</p>
-                <p className="text-2xl font-bold text-foreground">
-                  {wallets.filter((w) => w.is_active).length}
-                </p>
+                <p className="text-muted-foreground text-sm">Total Clicks</p>
+                <p className="text-2xl font-bold text-foreground">{totalClicks}</p>
+              </div>
+            </div>
+          </div>
+          <div className="glass rounded-xl p-5">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 bg-amber-500/20 rounded-lg flex items-center justify-center">
+                <BarChart3 className="w-6 h-6 text-amber-500" />
+              </div>
+              <div>
+                <p className="text-muted-foreground text-sm">Revenue</p>
+                <p className="text-2xl font-bold text-foreground">${totalRevenue}</p>
               </div>
             </div>
           </div>
         </div>
 
         {/* Tabs */}
-        <Tabs defaultValue="wallets" className="space-y-4">
+        <Tabs defaultValue="links" className="space-y-4">
           <TabsList className="bg-card border border-border">
-            <TabsTrigger value="wallets">Wallets</TabsTrigger>
-            <TabsTrigger value="links">Links</TabsTrigger>
-            <TabsTrigger value="payments">Payments</TabsTrigger>
+            <TabsTrigger value="links" className="gap-2">
+              <Link2 className="w-4 h-4" />
+              Links
+            </TabsTrigger>
+            <TabsTrigger value="domains" className="gap-2">
+              <Globe className="w-4 h-4" />
+              Domains
+            </TabsTrigger>
+            <TabsTrigger value="wallets" className="gap-2">
+              <Wallet className="w-4 h-4" />
+              Wallets
+            </TabsTrigger>
+            <TabsTrigger value="payments" className="gap-2">
+              <CreditCard className="w-4 h-4" />
+              Payments
+            </TabsTrigger>
           </TabsList>
+
+          {/* Links Tab */}
+          <TabsContent value="links" className="space-y-4">
+            <div className="flex justify-between items-center">
+              <h2 className="font-heading text-lg font-semibold text-foreground">All Links</h2>
+              <p className="text-sm text-muted-foreground">{links.length} total</p>
+            </div>
+            <div className="glass rounded-xl overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-border">
+                    <TableHead className="text-muted-foreground">Short URL</TableHead>
+                    <TableHead className="text-muted-foreground">Original URL</TableHead>
+                    <TableHead className="text-muted-foreground">Plan</TableHead>
+                    <TableHead className="text-muted-foreground">Status</TableHead>
+                    <TableHead className="text-muted-foreground">Clicks</TableHead>
+                    <TableHead className="text-muted-foreground">Created</TableHead>
+                    <TableHead className="text-muted-foreground text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {links.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                        No links yet
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    links.map((link) => (
+                      <TableRow key={link.id} className="border-border">
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <code className="text-sm text-primary font-mono">
+                              {link.custom_domain}/{link.short_code}
+                            </code>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6"
+                              onClick={() => copyToClipboard(`https://${link.custom_domain}/${link.short_code}`, link.id)}
+                            >
+                              {copied === link.id ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
+                            </Button>
+                          </div>
+                        </TableCell>
+                        <TableCell className="max-w-[200px]">
+                          <div className="flex items-center gap-2">
+                            <span className="truncate text-muted-foreground text-sm">{link.original_url}</span>
+                            <a href={link.original_url} target="_blank" rel="noopener noreferrer">
+                              <ExternalLink className="w-3 h-3 text-muted-foreground hover:text-foreground" />
+                            </a>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <span className={`px-2 py-1 rounded-full text-xs ${
+                            link.plan_type === 'pro' ? 'bg-primary/20 text-primary' : 'bg-muted text-muted-foreground'
+                          }`}>
+                            {link.plan_type}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <span className={`px-2 py-1 rounded-full text-xs ${getStatusColor(link.status)}`}>
+                            {link.status.replace("_", " ")}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-foreground font-medium">{link.click_count}</TableCell>
+                        <TableCell className="text-muted-foreground text-sm">
+                          {formatDate(link.created_at)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <Select
+                              value={link.status}
+                              onValueChange={(value) => handleUpdateLinkStatus(link.id, value as Link["status"])}
+                            >
+                              <SelectTrigger className="w-28 h-8 text-xs bg-input border-border">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="pending_payment">Pending</SelectItem>
+                                <SelectItem value="active">Active</SelectItem>
+                                <SelectItem value="expired">Expired</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive">
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent className="glass border-border">
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Delete Link</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Are you sure you want to delete this link? This action cannot be undone.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => handleDeleteLink(link.id)} className="bg-destructive text-destructive-foreground">
+                                    Delete
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </TabsContent>
+
+          {/* Domains Tab */}
+          <TabsContent value="domains" className="space-y-4">
+            <div className="flex justify-between items-center">
+              <div>
+                <h2 className="font-heading text-lg font-semibold text-foreground">Custom Domains</h2>
+                <p className="text-sm text-muted-foreground">Manage your branded short link domains</p>
+              </div>
+              <Dialog open={domainDialogOpen} onOpenChange={setDomainDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="pricing">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Domain
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="glass border-border">
+                  <DialogHeader>
+                    <DialogTitle>Add Custom Domain</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>Domain Name</Label>
+                      <Input
+                        placeholder="yourdomain.com"
+                        value={newDomain}
+                        onChange={(e) => setNewDomain(e.target.value)}
+                        className="bg-input border-border"
+                      />
+                    </div>
+                    <div className="p-3 bg-muted rounded-lg text-sm text-muted-foreground">
+                      <p className="font-medium text-foreground mb-2">DNS Configuration:</p>
+                      <p>Point your domain to: <code className="text-primary">185.158.133.1</code></p>
+                    </div>
+                    <Button onClick={handleAddDomain} className="w-full" variant="pricing">
+                      Add Domain
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </div>
+
+            <div className="glass rounded-xl overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-border">
+                    <TableHead className="text-muted-foreground">Domain</TableHead>
+                    <TableHead className="text-muted-foreground">Verified</TableHead>
+                    <TableHead className="text-muted-foreground">Active</TableHead>
+                    <TableHead className="text-muted-foreground">Created</TableHead>
+                    <TableHead className="text-muted-foreground text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {domains.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                        No domains added yet
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    domains.map((domain) => (
+                      <TableRow key={domain.id} className="border-border">
+                        <TableCell className="font-medium text-foreground">
+                          <div className="flex items-center gap-2">
+                            <Globe className="w-4 h-4 text-primary" />
+                            {domain.domain}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <span className={`px-2 py-1 rounded-full text-xs ${
+                            domain.is_verified ? "text-green-500 bg-green-500/10" : "text-amber-500 bg-amber-500/10"
+                          }`}>
+                            {domain.is_verified ? "Verified" : "Pending"}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <span className={`px-2 py-1 rounded-full text-xs ${
+                            domain.is_active ? "text-green-500 bg-green-500/10" : "text-red-500 bg-red-500/10"
+                          }`}>
+                            {domain.is_active ? "Active" : "Inactive"}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {formatDate(domain.created_at)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <Dialog>
+                              <DialogTrigger asChild>
+                                <Button variant="ghost" size="icon" onClick={() => setEditingDomain(domain)}>
+                                  <Edit className="w-4 h-4" />
+                                </Button>
+                              </DialogTrigger>
+                              <DialogContent className="glass border-border">
+                                <DialogHeader>
+                                  <DialogTitle>Edit Domain</DialogTitle>
+                                </DialogHeader>
+                                {editingDomain && (
+                                  <div className="space-y-4">
+                                    <div className="space-y-2">
+                                      <Label>Domain Name</Label>
+                                      <Input
+                                        value={editingDomain.domain}
+                                        onChange={(e) => setEditingDomain({ ...editingDomain, domain: e.target.value })}
+                                        className="bg-input border-border"
+                                      />
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                      <Label htmlFor="verified">Verified</Label>
+                                      <Switch
+                                        id="verified"
+                                        checked={editingDomain.is_verified}
+                                        onCheckedChange={(checked) => setEditingDomain({ ...editingDomain, is_verified: checked })}
+                                      />
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                      <Label htmlFor="active">Active</Label>
+                                      <Switch
+                                        id="active"
+                                        checked={editingDomain.is_active}
+                                        onCheckedChange={(checked) => setEditingDomain({ ...editingDomain, is_active: checked })}
+                                      />
+                                    </div>
+                                    <Button onClick={handleUpdateDomain} className="w-full" variant="pricing">
+                                      Save Changes
+                                    </Button>
+                                  </div>
+                                )}
+                              </DialogContent>
+                            </Dialog>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent className="glass border-border">
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Delete Domain</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Are you sure you want to delete this domain? Links using this domain will stop working.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => handleDeleteDomain(domain.id)} className="bg-destructive text-destructive-foreground">
+                                    Delete
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </TabsContent>
 
           {/* Wallets Tab */}
           <TabsContent value="wallets" className="space-y-4">
             <div className="flex justify-between items-center">
-              <h2 className="font-heading text-lg font-semibold text-foreground">
-                Crypto Wallets
-              </h2>
+              <div>
+                <h2 className="font-heading text-lg font-semibold text-foreground">Crypto Wallets</h2>
+                <p className="text-sm text-muted-foreground">Payment receiving addresses</p>
+              </div>
               <Dialog open={walletDialogOpen} onOpenChange={setWalletDialogOpen}>
                 <DialogTrigger asChild>
                   <Button variant="pricing">
@@ -336,9 +790,7 @@ const AdminDashboard = () => {
                       <Input
                         placeholder="BTC, ETH, USDT..."
                         value={newWallet.currency}
-                        onChange={(e) =>
-                          setNewWallet({ ...newWallet, currency: e.target.value.toUpperCase() })
-                        }
+                        onChange={(e) => setNewWallet({ ...newWallet, currency: e.target.value.toUpperCase() })}
                         className="bg-input border-border"
                       />
                     </div>
@@ -347,9 +799,7 @@ const AdminDashboard = () => {
                       <Input
                         placeholder="Enter wallet address"
                         value={newWallet.wallet_address}
-                        onChange={(e) =>
-                          setNewWallet({ ...newWallet, wallet_address: e.target.value })
-                        }
+                        onChange={(e) => setNewWallet({ ...newWallet, wallet_address: e.target.value })}
                         className="bg-input border-border"
                       />
                     </div>
@@ -373,165 +823,112 @@ const AdminDashboard = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {wallets.map((wallet) => (
-                    <TableRow key={wallet.id} className="border-border">
-                      <TableCell className="font-medium text-foreground">
-                        {wallet.currency}
+                  {wallets.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                        No wallets added yet
                       </TableCell>
-                      <TableCell className="font-mono text-sm text-muted-foreground max-w-xs truncate">
-                        {wallet.wallet_address}
-                      </TableCell>
-                      <TableCell>
-                        <span
-                          className={`px-2 py-1 rounded-full text-xs ${
+                    </TableRow>
+                  ) : (
+                    wallets.map((wallet) => (
+                      <TableRow key={wallet.id} className="border-border">
+                        <TableCell className="font-bold text-foreground">{wallet.currency}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <code className="text-sm text-muted-foreground max-w-[250px] truncate">
+                              {wallet.wallet_address}
+                            </code>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6"
+                              onClick={() => copyToClipboard(wallet.wallet_address, wallet.id)}
+                            >
+                              {copied === wallet.id ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
+                            </Button>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <span className={`px-2 py-1 rounded-full text-xs ${
                             wallet.is_active ? "text-green-500 bg-green-500/10" : "text-red-500 bg-red-500/10"
-                          }`}
-                        >
-                          {wallet.is_active ? "Active" : "Inactive"}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {formatDate(wallet.created_at)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <Dialog>
-                            <DialogTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => setEditingWallet(wallet)}
-                              >
-                                <Edit className="w-4 h-4" />
-                              </Button>
-                            </DialogTrigger>
-                            <DialogContent className="glass border-border">
-                              <DialogHeader>
-                                <DialogTitle>Edit Wallet</DialogTitle>
-                              </DialogHeader>
-                              {editingWallet && (
-                                <div className="space-y-4">
-                                  <div className="space-y-2">
-                                    <Label>Currency</Label>
-                                    <Input
-                                      value={editingWallet.currency}
-                                      onChange={(e) =>
-                                        setEditingWallet({
-                                          ...editingWallet,
-                                          currency: e.target.value.toUpperCase(),
-                                        })
-                                      }
-                                      className="bg-input border-border"
-                                    />
+                          }`}>
+                            {wallet.is_active ? "Active" : "Inactive"}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {formatDate(wallet.created_at)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <Dialog>
+                              <DialogTrigger asChild>
+                                <Button variant="ghost" size="icon" onClick={() => setEditingWallet(wallet)}>
+                                  <Edit className="w-4 h-4" />
+                                </Button>
+                              </DialogTrigger>
+                              <DialogContent className="glass border-border">
+                                <DialogHeader>
+                                  <DialogTitle>Edit Wallet</DialogTitle>
+                                </DialogHeader>
+                                {editingWallet && (
+                                  <div className="space-y-4">
+                                    <div className="space-y-2">
+                                      <Label>Currency</Label>
+                                      <Input
+                                        value={editingWallet.currency}
+                                        onChange={(e) => setEditingWallet({ ...editingWallet, currency: e.target.value.toUpperCase() })}
+                                        className="bg-input border-border"
+                                      />
+                                    </div>
+                                    <div className="space-y-2">
+                                      <Label>Wallet Address</Label>
+                                      <Input
+                                        value={editingWallet.wallet_address}
+                                        onChange={(e) => setEditingWallet({ ...editingWallet, wallet_address: e.target.value })}
+                                        className="bg-input border-border"
+                                      />
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                      <Label htmlFor="wallet-active">Active</Label>
+                                      <Switch
+                                        id="wallet-active"
+                                        checked={editingWallet.is_active ?? false}
+                                        onCheckedChange={(checked) => setEditingWallet({ ...editingWallet, is_active: checked })}
+                                      />
+                                    </div>
+                                    <Button onClick={handleUpdateWallet} className="w-full" variant="pricing">
+                                      Save Changes
+                                    </Button>
                                   </div>
-                                  <div className="space-y-2">
-                                    <Label>Wallet Address</Label>
-                                    <Input
-                                      value={editingWallet.wallet_address}
-                                      onChange={(e) =>
-                                        setEditingWallet({
-                                          ...editingWallet,
-                                          wallet_address: e.target.value,
-                                        })
-                                      }
-                                      className="bg-input border-border"
-                                    />
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    <input
-                                      type="checkbox"
-                                      id="active"
-                                      checked={editingWallet.is_active ?? false}
-                                      onChange={(e) =>
-                                        setEditingWallet({
-                                          ...editingWallet,
-                                          is_active: e.target.checked,
-                                        })
-                                      }
-                                      className="rounded border-border"
-                                    />
-                                    <Label htmlFor="active">Active</Label>
-                                  </div>
-                                  <Button
-                                    onClick={handleUpdateWallet}
-                                    className="w-full"
-                                    variant="pricing"
-                                  >
-                                    Save Changes
-                                  </Button>
-                                </div>
-                              )}
-                            </DialogContent>
-                          </Dialog>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleDeleteWallet(wallet.id)}
-                            className="text-destructive hover:text-destructive"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </TabsContent>
-
-          {/* Links Tab */}
-          <TabsContent value="links" className="space-y-4">
-            <h2 className="font-heading text-lg font-semibold text-foreground">All Links</h2>
-            <div className="glass rounded-xl overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow className="border-border">
-                    <TableHead className="text-muted-foreground">Short Code</TableHead>
-                    <TableHead className="text-muted-foreground">Original URL</TableHead>
-                    <TableHead className="text-muted-foreground">Plan</TableHead>
-                    <TableHead className="text-muted-foreground">Status</TableHead>
-                    <TableHead className="text-muted-foreground">Clicks</TableHead>
-                    <TableHead className="text-muted-foreground">Created</TableHead>
-                    <TableHead className="text-muted-foreground text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {links.map((link) => (
-                    <TableRow key={link.id} className="border-border">
-                      <TableCell className="font-mono text-primary">{link.short_code}</TableCell>
-                      <TableCell className="max-w-xs truncate text-muted-foreground">
-                        {link.original_url}
-                      </TableCell>
-                      <TableCell className="capitalize text-foreground">{link.plan_type}</TableCell>
-                      <TableCell>
-                        <span className={`px-2 py-1 rounded-full text-xs ${getStatusColor(link.status)}`}>
-                          {link.status.replace("_", " ")}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-foreground">{link.click_count}</TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {formatDate(link.created_at)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Select
-                          value={link.status}
-                          onValueChange={(value) =>
-                            handleUpdateLinkStatus(link.id, value as Link["status"])
-                          }
-                        >
-                          <SelectTrigger className="w-32 bg-input border-border">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="pending_payment">Pending</SelectItem>
-                            <SelectItem value="active">Active</SelectItem>
-                            <SelectItem value="expired">Expired</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                                )}
+                              </DialogContent>
+                            </Dialog>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent className="glass border-border">
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Delete Wallet</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Are you sure you want to delete this wallet?
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => handleDeleteWallet(wallet.id)} className="bg-destructive text-destructive-foreground">
+                                    Delete
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
                 </TableBody>
               </Table>
             </div>
@@ -539,7 +936,14 @@ const AdminDashboard = () => {
 
           {/* Payments Tab */}
           <TabsContent value="payments" className="space-y-4">
-            <h2 className="font-heading text-lg font-semibold text-foreground">All Payments</h2>
+            <div className="flex justify-between items-center">
+              <div>
+                <h2 className="font-heading text-lg font-semibold text-foreground">Payment History</h2>
+                <p className="text-sm text-muted-foreground">
+                  {payments.filter(p => p.status === "confirmed").length} confirmed, {payments.filter(p => p.status === "pending").length} pending
+                </p>
+              </div>
+            </div>
             <div className="glass rounded-xl overflow-hidden">
               <Table>
                 <TableHeader>
@@ -554,43 +958,74 @@ const AdminDashboard = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {payments.map((payment) => (
-                    <TableRow key={payment.id} className="border-border">
-                      <TableCell className="font-bold text-foreground">${payment.amount}</TableCell>
-                      <TableCell className="text-foreground">{payment.currency}</TableCell>
-                      <TableCell className="font-mono text-xs max-w-[120px] truncate text-muted-foreground">
-                        {payment.wallet_address}
-                      </TableCell>
-                      <TableCell>
-                        <span className={`px-2 py-1 rounded-full text-xs ${getStatusColor(payment.status)}`}>
-                          {payment.status}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {formatDate(payment.expires_at)}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {formatDate(payment.created_at)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Select
-                          value={payment.status}
-                          onValueChange={(value) =>
-                            handleUpdatePaymentStatus(payment.id, value as Payment["status"])
-                          }
-                        >
-                          <SelectTrigger className="w-32 bg-input border-border">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="pending">Pending</SelectItem>
-                            <SelectItem value="confirmed">Confirmed</SelectItem>
-                            <SelectItem value="expired">Expired</SelectItem>
-                          </SelectContent>
-                        </Select>
+                  {payments.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                        No payments yet
                       </TableCell>
                     </TableRow>
-                  ))}
+                  ) : (
+                    payments.map((payment) => (
+                      <TableRow key={payment.id} className="border-border">
+                        <TableCell className="font-bold text-foreground">${payment.amount}</TableCell>
+                        <TableCell className="text-foreground">{payment.currency}</TableCell>
+                        <TableCell>
+                          <code className="text-xs text-muted-foreground max-w-[120px] truncate block">
+                            {payment.wallet_address}
+                          </code>
+                        </TableCell>
+                        <TableCell>
+                          <span className={`px-2 py-1 rounded-full text-xs ${getStatusColor(payment.status)}`}>
+                            {payment.status}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground text-sm">
+                          {formatDate(payment.expires_at)}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground text-sm">
+                          {formatDate(payment.created_at)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <Select
+                              value={payment.status}
+                              onValueChange={(value) => handleUpdatePaymentStatus(payment.id, value as Payment["status"])}
+                            >
+                              <SelectTrigger className="w-28 h-8 text-xs bg-input border-border">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="pending">Pending</SelectItem>
+                                <SelectItem value="confirmed">Confirmed</SelectItem>
+                                <SelectItem value="expired">Expired</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive">
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent className="glass border-border">
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Delete Payment</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Are you sure you want to delete this payment record?
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => handleDeletePayment(payment.id)} className="bg-destructive text-destructive-foreground">
+                                    Delete
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
                 </TableBody>
               </Table>
             </div>

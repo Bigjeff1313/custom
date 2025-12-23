@@ -3,7 +3,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Copy, Check, Loader2, Clock, Wallet } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Copy, Check, Loader2, Clock, Wallet, Globe, AlertCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -19,12 +26,20 @@ interface CryptoWallet {
   wallet_address: string;
 }
 
+interface CustomDomain {
+  id: string;
+  domain: string;
+  is_verified: boolean;
+  is_active: boolean;
+}
+
 const CreateLinkModal = ({ open, onOpenChange, planType }: CreateLinkModalProps) => {
   const [step, setStep] = useState<"input" | "payment" | "success">("input");
   const [originalUrl, setOriginalUrl] = useState("");
-  const [customDomain, setCustomDomain] = useState("");
+  const [selectedDomain, setSelectedDomain] = useState<string>("");
   const [selectedCrypto, setSelectedCrypto] = useState<string>("");
   const [wallets, setWallets] = useState<CryptoWallet[]>([]);
+  const [domains, setDomains] = useState<CustomDomain[]>([]);
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
   const [linkData, setLinkData] = useState<{ shortCode: string; paymentId: string } | null>(null);
@@ -36,6 +51,7 @@ const CreateLinkModal = ({ open, onOpenChange, planType }: CreateLinkModalProps)
   useEffect(() => {
     if (open) {
       fetchWallets();
+      fetchDomains();
     }
   }, [open]);
 
@@ -59,6 +75,20 @@ const CreateLinkModal = ({ open, onOpenChange, planType }: CreateLinkModalProps)
     if (error) toast.error("Failed to load payment options");
   };
 
+  const fetchDomains = async () => {
+    const { data, error } = await supabase
+      .from("custom_domains")
+      .select("*")
+      .eq("is_active", true)
+      .eq("is_verified", true);
+
+    if (data && data.length > 0) {
+      setDomains(data as CustomDomain[]);
+      setSelectedDomain(data[0].domain);
+    }
+    if (error) toast.error("Failed to load domains");
+  };
+
   const generateShortCode = () => {
     const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
     let result = "";
@@ -68,14 +98,37 @@ const CreateLinkModal = ({ open, onOpenChange, planType }: CreateLinkModalProps)
     return result;
   };
 
+  const isValidUrl = (url: string) => {
+    try {
+      new URL(url);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const formatUrl = (url: string) => {
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      return `https://${url}`;
+    }
+    return url;
+  };
+
   const handleCreateLink = async () => {
-    if (!originalUrl) {
-      toast.error("Please enter a URL");
+    const formattedUrl = formatUrl(originalUrl);
+    
+    if (!isValidUrl(formattedUrl)) {
+      toast.error("Please enter a valid URL");
       return;
     }
 
     if (!selectedCrypto || !selectedWallet) {
       toast.error("Please select a payment method");
+      return;
+    }
+
+    if (!selectedDomain) {
+      toast.error("No domain available");
       return;
     }
 
@@ -89,9 +142,9 @@ const CreateLinkModal = ({ open, onOpenChange, planType }: CreateLinkModalProps)
       const { data: link, error: linkError } = await supabase
         .from("links")
         .insert({
-          original_url: originalUrl,
+          original_url: formattedUrl,
           short_code: shortCode,
-          custom_domain: planType === "pro" && customDomain ? customDomain : "customslinks.com",
+          custom_domain: selectedDomain,
           plan_type: planType,
           status: "pending_payment",
         })
@@ -119,8 +172,8 @@ const CreateLinkModal = ({ open, onOpenChange, planType }: CreateLinkModalProps)
       setLinkData({ shortCode, paymentId: payment.id });
       setStep("payment");
       setTimeLeft(900);
-    } catch (error) {
-      toast.error("Failed to create link");
+    } catch (error: any) {
+      toast.error(error.message || "Failed to create link");
       console.error(error);
     } finally {
       setLoading(false);
@@ -132,8 +185,7 @@ const CreateLinkModal = ({ open, onOpenChange, planType }: CreateLinkModalProps)
 
     setLoading(true);
     try {
-      // In production, you'd verify the transaction on the blockchain
-      // For now, we'll simulate payment confirmation
+      // Update payment status
       const { error: paymentError } = await supabase
         .from("payments")
         .update({ status: "confirmed" })
@@ -151,8 +203,8 @@ const CreateLinkModal = ({ open, onOpenChange, planType }: CreateLinkModalProps)
 
       setStep("success");
       toast.success("Payment confirmed! Your link is now active.");
-    } catch (error) {
-      toast.error("Failed to confirm payment");
+    } catch (error: any) {
+      toast.error(error.message || "Failed to confirm payment");
       console.error(error);
     } finally {
       setLoading(false);
@@ -175,7 +227,6 @@ const CreateLinkModal = ({ open, onOpenChange, planType }: CreateLinkModalProps)
   const resetModal = () => {
     setStep("input");
     setOriginalUrl("");
-    setCustomDomain("");
     setSelectedCrypto("");
     setSelectedWallet(null);
     setLinkData(null);
@@ -188,7 +239,7 @@ const CreateLinkModal = ({ open, onOpenChange, planType }: CreateLinkModalProps)
   };
 
   const shortUrl = linkData
-    ? `${planType === "pro" && customDomain ? customDomain : "customslinks.com"}/${linkData.shortCode}`
+    ? `${selectedDomain}/${linkData.shortCode}`
     : "";
 
   return (
@@ -215,39 +266,54 @@ const CreateLinkModal = ({ open, onOpenChange, planType }: CreateLinkModalProps)
               />
             </div>
 
-            {planType === "pro" && (
+            {planType === "pro" && domains.length > 1 && (
               <div className="space-y-2">
-                <Label htmlFor="domain">Custom Domain (Optional)</Label>
-                <Input
-                  id="domain"
-                  placeholder="yourdomain.com"
-                  value={customDomain}
-                  onChange={(e) => setCustomDomain(e.target.value)}
-                  className="bg-input border-border"
-                />
+                <Label htmlFor="domain">Select Domain</Label>
+                <Select value={selectedDomain} onValueChange={setSelectedDomain}>
+                  <SelectTrigger className="bg-input border-border">
+                    <SelectValue placeholder="Select a domain" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {domains.map((domain) => (
+                      <SelectItem key={domain.id} value={domain.domain}>
+                        <div className="flex items-center gap-2">
+                          <Globe className="w-4 h-4" />
+                          {domain.domain}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             )}
 
             <div className="space-y-2">
               <Label>Select Payment Method</Label>
-              <div className="grid grid-cols-2 gap-2">
-                {wallets.map((wallet) => (
-                  <button
-                    key={wallet.id}
-                    onClick={() => {
-                      setSelectedCrypto(wallet.currency);
-                      setSelectedWallet(wallet);
-                    }}
-                    className={`p-3 rounded-lg border transition-all ${
-                      selectedCrypto === wallet.currency
-                        ? "border-primary bg-primary/10"
-                        : "border-border bg-secondary/50 hover:border-primary/50"
-                    }`}
-                  >
-                    <span className="font-medium text-foreground">{wallet.currency}</span>
-                  </button>
-                ))}
-              </div>
+              {wallets.length === 0 ? (
+                <div className="flex items-center gap-2 p-3 bg-destructive/10 rounded-lg text-destructive text-sm">
+                  <AlertCircle className="w-4 h-4" />
+                  No payment methods available
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-2">
+                  {wallets.map((wallet) => (
+                    <button
+                      key={wallet.id}
+                      onClick={() => {
+                        setSelectedCrypto(wallet.currency);
+                        setSelectedWallet(wallet);
+                      }}
+                      className={`p-3 rounded-lg border transition-all ${
+                        selectedCrypto === wallet.currency
+                          ? "border-primary bg-primary/10"
+                          : "border-border bg-secondary/50 hover:border-primary/50"
+                      }`}
+                    >
+                      <span className="font-medium text-foreground">{wallet.currency}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="flex items-center justify-between pt-4 border-t border-border">
@@ -257,7 +323,7 @@ const CreateLinkModal = ({ open, onOpenChange, planType }: CreateLinkModalProps)
 
             <Button
               onClick={handleCreateLink}
-              disabled={loading || !originalUrl || !selectedCrypto}
+              disabled={loading || !originalUrl || !selectedCrypto || wallets.length === 0}
               className="w-full"
               variant="pricing"
             >
@@ -276,6 +342,13 @@ const CreateLinkModal = ({ open, onOpenChange, planType }: CreateLinkModalProps)
               <Clock className="w-4 h-4" />
               <span className="font-medium">Time remaining: {formatTime(timeLeft)}</span>
             </div>
+
+            {timeLeft === 0 && (
+              <div className="flex items-center gap-2 p-3 bg-destructive/10 rounded-lg text-destructive text-sm">
+                <AlertCircle className="w-4 h-4" />
+                Payment expired. Please create a new link.
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label>Send exactly</Label>
@@ -308,12 +381,12 @@ const CreateLinkModal = ({ open, onOpenChange, planType }: CreateLinkModalProps)
 
             <div className="p-3 bg-muted rounded-lg text-sm text-muted-foreground">
               After sending, click the button below to confirm your payment. 
-              Your link will be activated once verified.
+              Your link will be activated once verified by admin.
             </div>
 
             <Button
               onClick={handleConfirmPayment}
-              disabled={loading}
+              disabled={loading || timeLeft === 0}
               className="w-full"
               variant="pricing"
             >
@@ -331,6 +404,10 @@ const CreateLinkModal = ({ open, onOpenChange, planType }: CreateLinkModalProps)
             <div className="w-16 h-16 mx-auto bg-primary/20 rounded-full flex items-center justify-center">
               <Check className="w-8 h-8 text-primary" />
             </div>
+
+            <p className="text-muted-foreground">
+              Your payment is being verified. Your link will be active shortly.
+            </p>
 
             <div className="space-y-2">
               <Label>Your shortened link</Label>

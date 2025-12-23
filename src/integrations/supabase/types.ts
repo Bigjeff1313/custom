@@ -38,6 +38,33 @@ export type Database = {
         }
         Relationships: []
       }
+      custom_domains: {
+        Row: {
+          created_at: string
+          domain: string
+          id: string
+          is_active: boolean | null
+          is_verified: boolean | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          domain: string
+          id?: string
+          is_active?: boolean | null
+          is_verified?: boolean | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          domain?: string
+          id?: string
+          is_active?: boolean | null
+          is_verified?: boolean | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       links: {
         Row: {
           click_count: number | null
