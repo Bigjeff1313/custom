@@ -1,10 +1,32 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Link2, Menu, X } from "lucide-react";
-import { useState } from "react";
+import { Link2, Menu, X, LogIn, UserPlus } from "lucide-react";
+import { useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { User } from "@supabase/supabase-js";
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
+
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        setUser(session?.user ?? null);
+      }
+    );
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setUser(null);
+  };
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 glass">
@@ -33,11 +55,35 @@ const Navbar = () => {
             </a>
           </div>
 
-          {/* CTA Button */}
-          <div className="hidden md:block">
-            <Button variant="hero" size="default">
-              Get Started
-            </Button>
+          {/* Auth Buttons */}
+          <div className="hidden md:flex items-center gap-3">
+            {user ? (
+              <>
+                <Link to="/admin">
+                  <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
+                    Dashboard
+                  </Button>
+                </Link>
+                <Button variant="outline" size="sm" onClick={handleLogout}>
+                  Logout
+                </Button>
+              </>
+            ) : (
+              <>
+                <Link to="/auth">
+                  <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground gap-2">
+                    <LogIn className="w-4 h-4" />
+                    Login
+                  </Button>
+                </Link>
+                <Link to="/auth">
+                  <Button variant="hero" size="sm" className="gap-2">
+                    <UserPlus className="w-4 h-4" />
+                    Sign Up
+                  </Button>
+                </Link>
+              </>
+            )}
           </div>
 
           {/* Mobile Menu Button */}
@@ -62,9 +108,33 @@ const Navbar = () => {
               <a href="#faq" className="text-muted-foreground hover:text-foreground transition-colors duration-200 py-2">
                 FAQ
               </a>
-              <Button variant="hero" size="default" className="mt-2">
-                Get Started
-              </Button>
+              {user ? (
+                <>
+                  <Link to="/admin" className="py-2">
+                    <Button variant="ghost" size="sm" className="w-full justify-start">
+                      Dashboard
+                    </Button>
+                  </Link>
+                  <Button variant="outline" size="sm" onClick={handleLogout} className="mt-2">
+                    Logout
+                  </Button>
+                </>
+              ) : (
+                <div className="flex flex-col gap-2 mt-2">
+                  <Link to="/auth">
+                    <Button variant="ghost" size="sm" className="w-full gap-2">
+                      <LogIn className="w-4 h-4" />
+                      Login
+                    </Button>
+                  </Link>
+                  <Link to="/auth">
+                    <Button variant="hero" size="sm" className="w-full gap-2">
+                      <UserPlus className="w-4 h-4" />
+                      Sign Up
+                    </Button>
+                  </Link>
+                </div>
+              )}
             </div>
           </div>
         )}
