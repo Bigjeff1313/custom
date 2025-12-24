@@ -59,7 +59,7 @@ const Navbar = () => {
           <div className="hidden md:flex items-center gap-3">
             {user ? (
               <>
-                <Link to="/admin">
+                <Link to="/dashboard">
                   <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
                     Dashboard
                   </Button>
@@ -110,7 +110,7 @@ const Navbar = () => {
               </a>
               {user ? (
                 <>
-                  <Link to="/admin" className="py-2">
+                  <Link to="/dashboard" className="py-2">
                     <Button variant="ghost" size="sm" className="w-full justify-start">
                       Dashboard
                     </Button>

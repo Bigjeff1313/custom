@@ -61,14 +61,18 @@ import {
   MousePointerClick,
   TrendingUp,
   Home,
+  Users,
+  Shield,
+  UserPlus,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import type { Tables } from "@/integrations/supabase/types";
+import type { Tables, Enums } from "@/integrations/supabase/types";
 
 type Link = Tables<"links">;
 type Payment = Tables<"payments">;
 type CryptoWallet = Tables<"crypto_wallets">;
+type AppRole = Enums<"app_role">;
 
 interface CustomDomain {
   id: string;
@@ -79,18 +83,28 @@ interface CustomDomain {
   updated_at: string;
 }
 
+interface UserWithRole {
+  id: string;
+  email: string;
+  created_at: string;
+  role: AppRole | null;
+}
+
 const AdminDashboard = () => {
   const [links, setLinks] = useState<Link[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [wallets, setWallets] = useState<CryptoWallet[]>([]);
   const [domains, setDomains] = useState<CustomDomain[]>([]);
+  const [users, setUsers] = useState<UserWithRole[]>([]);
   const [loading, setLoading] = useState(true);
   const [walletDialogOpen, setWalletDialogOpen] = useState(false);
   const [domainDialogOpen, setDomainDialogOpen] = useState(false);
+  const [userDialogOpen, setUserDialogOpen] = useState(false);
   const [editingWallet, setEditingWallet] = useState<CryptoWallet | null>(null);
   const [editingDomain, setEditingDomain] = useState<CustomDomain | null>(null);
   const [newWallet, setNewWallet] = useState({ currency: "", wallet_address: "" });
   const [newDomain, setNewDomain] = useState("");
+  const [newUser, setNewUser] = useState({ email: "", password: "", role: "user" as AppRole });
   const [copied, setCopied] = useState<string | null>(null);
   const navigate = useNavigate();
 
@@ -123,7 +137,7 @@ const AdminDashboard = () => {
 
   const fetchData = async () => {
     setLoading(true);
-    await Promise.all([fetchLinks(), fetchPayments(), fetchWallets(), fetchDomains()]);
+    await Promise.all([fetchLinks(), fetchPayments(), fetchWallets(), fetchDomains(), fetchUsers()]);
     setLoading(false);
   };
 
@@ -165,6 +179,34 @@ const AdminDashboard = () => {
 
     if (data) setDomains(data as CustomDomain[]);
     if (error) toast.error("Failed to load domains");
+  };
+
+  const fetchUsers = async () => {
+    // Call edge function to get users list
+    const { data, error } = await supabase.functions.invoke("mysql-api", {
+      body: { action: "list-users" },
+    });
+
+    if (error) {
+      // Fallback: just get roles from user_roles table
+      const { data: rolesData, error: rolesError } = await supabase
+        .from("user_roles")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (rolesData) {
+        const usersWithRoles: UserWithRole[] = rolesData.map((r) => ({
+          id: r.user_id,
+          email: `User ${r.user_id.slice(0, 8)}...`,
+          created_at: r.created_at,
+          role: r.role,
+        }));
+        setUsers(usersWithRoles);
+      }
+      if (rolesError) toast.error("Failed to load users");
+    } else if (data?.users) {
+      setUsers(data.users);
+    }
   };
 
   const handleLogout = async () => {
@@ -289,6 +331,83 @@ const AdminDashboard = () => {
 
     toast.success("Domain deleted");
     fetchDomains();
+  };
+
+  const handleCreateUser = async () => {
+    if (!newUser.email || !newUser.password) {
+      toast.error("Please fill all fields");
+      return;
+    }
+
+    if (newUser.password.length < 6) {
+      toast.error("Password must be at least 6 characters");
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase.functions.invoke("create-admin", {
+        body: { email: newUser.email, password: newUser.password },
+      });
+
+      if (error) throw error;
+
+      // If role is user (not admin), we need to update the role
+      if (newUser.role === "user" && data?.userId) {
+        await supabase.from("user_roles").update({ role: "user" }).eq("user_id", data.userId);
+      }
+
+      toast.success(data?.message || "User created successfully");
+      setNewUser({ email: "", password: "", role: "user" });
+      setUserDialogOpen(false);
+      fetchUsers();
+    } catch (error: any) {
+      toast.error(error.message || "Failed to create user");
+    }
+  };
+
+  const handleUpdateUserRole = async (userId: string, role: AppRole) => {
+    // Check if user has existing role
+    const { data: existingRole } = await supabase
+      .from("user_roles")
+      .select("*")
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (existingRole) {
+      const { error } = await supabase
+        .from("user_roles")
+        .update({ role })
+        .eq("user_id", userId);
+
+      if (error) {
+        toast.error("Failed to update role");
+        return;
+      }
+    } else {
+      const { error } = await supabase
+        .from("user_roles")
+        .insert({ user_id: userId, role });
+
+      if (error) {
+        toast.error("Failed to assign role");
+        return;
+      }
+    }
+
+    toast.success("Role updated");
+    fetchUsers();
+  };
+
+  const handleDeleteUserRole = async (userId: string) => {
+    const { error } = await supabase.from("user_roles").delete().eq("user_id", userId);
+
+    if (error) {
+      toast.error("Failed to remove role");
+      return;
+    }
+
+    toast.success("User role removed");
+    fetchUsers();
   };
 
   const handleUpdateLinkStatus = async (id: string, status: Link["status"]) => {
@@ -489,6 +608,10 @@ const AdminDashboard = () => {
             <TabsTrigger value="payments" className="gap-2">
               <CreditCard className="w-4 h-4" />
               Payments
+            </TabsTrigger>
+            <TabsTrigger value="users" className="gap-2">
+              <Users className="w-4 h-4" />
+              Users
             </TabsTrigger>
           </TabsList>
 
@@ -1017,6 +1140,155 @@ const AdminDashboard = () => {
                                   <AlertDialogCancel>Cancel</AlertDialogCancel>
                                   <AlertDialogAction onClick={() => handleDeletePayment(payment.id)} className="bg-destructive text-destructive-foreground">
                                     Delete
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </TabsContent>
+
+          {/* Users Tab */}
+          <TabsContent value="users" className="space-y-4">
+            <div className="flex justify-between items-center">
+              <div>
+                <h2 className="font-heading text-lg font-semibold text-foreground">User Management</h2>
+                <p className="text-sm text-muted-foreground">Create and manage user accounts</p>
+              </div>
+              <Dialog open={userDialogOpen} onOpenChange={setUserDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="pricing">
+                    <UserPlus className="w-4 h-4 mr-2" />
+                    Create User
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="glass border-border">
+                  <DialogHeader>
+                    <DialogTitle>Create New User</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>Email</Label>
+                      <Input
+                        type="email"
+                        placeholder="user@example.com"
+                        value={newUser.email}
+                        onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+                        className="bg-input border-border"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Password</Label>
+                      <Input
+                        type="password"
+                        placeholder="••••••••"
+                        value={newUser.password}
+                        onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+                        className="bg-input border-border"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Role</Label>
+                      <Select
+                        value={newUser.role}
+                        onValueChange={(value) => setNewUser({ ...newUser, role: value as AppRole })}
+                      >
+                        <SelectTrigger className="bg-input border-border">
+                          <SelectValue placeholder="Select role" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="user">User</SelectItem>
+                          <SelectItem value="admin">Admin</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <Button onClick={handleCreateUser} className="w-full" variant="pricing">
+                      Create User
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </div>
+
+            <div className="glass rounded-xl overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-border">
+                    <TableHead className="text-muted-foreground">User ID</TableHead>
+                    <TableHead className="text-muted-foreground">Email</TableHead>
+                    <TableHead className="text-muted-foreground">Role</TableHead>
+                    <TableHead className="text-muted-foreground">Created</TableHead>
+                    <TableHead className="text-muted-foreground text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {users.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                        No users with roles found
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    users.map((user) => (
+                      <TableRow key={user.id} className="border-border">
+                        <TableCell>
+                          <code className="text-xs text-muted-foreground">
+                            {user.id.slice(0, 8)}...
+                          </code>
+                        </TableCell>
+                        <TableCell className="font-medium text-foreground">
+                          {user.email}
+                        </TableCell>
+                        <TableCell>
+                          <span className={`px-2 py-1 rounded-full text-xs flex items-center gap-1 w-fit ${
+                            user.role === "admin" 
+                              ? "text-amber-500 bg-amber-500/10" 
+                              : "text-blue-500 bg-blue-500/10"
+                          }`}>
+                            {user.role === "admin" && <Shield className="w-3 h-3" />}
+                            {user.role || "No role"}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground text-sm">
+                          {formatDate(user.created_at)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <Select
+                              value={user.role || "user"}
+                              onValueChange={(value) => handleUpdateUserRole(user.id, value as AppRole)}
+                            >
+                              <SelectTrigger className="w-24 h-8 text-xs bg-input border-border">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="user">User</SelectItem>
+                                <SelectItem value="admin">Admin</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive">
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent className="glass border-border">
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Remove User Role</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    This will remove the user's role. They will no longer have access.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => handleDeleteUserRole(user.id)} className="bg-destructive text-destructive-foreground">
+                                    Remove
                                   </AlertDialogAction>
                                 </AlertDialogFooter>
                               </AlertDialogContent>
