@@ -10,7 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Copy, Check, Loader2, Clock, Wallet, Globe, AlertCircle, Plus, Settings, QrCode, Download } from "lucide-react";
+import { Copy, Check, Loader2, Clock, Wallet, Globe, AlertCircle, Plus, Settings, QrCode, Download, Send } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -32,10 +32,12 @@ interface CustomDomain {
   domain: string;
   is_verified: boolean;
   is_active: boolean;
+  user_id: string | null;
 }
 
 const DEFAULT_DOMAIN = "customtextx.com";
 const SERVER_IP = "72.60.119.80";
+const TELEGRAM_CONTACT = "https://t.me/STORMTOOLS101";
 
 const CreateLinkModal = ({ open, onOpenChange, initialUrl = "" }: CreateLinkModalProps) => {
   const [step, setStep] = useState<"input" | "payment" | "success" | "domain-setup">("input");
@@ -53,6 +55,7 @@ const CreateLinkModal = ({ open, onOpenChange, initialUrl = "" }: CreateLinkModa
   const [timeLeft, setTimeLeft] = useState(900); // 15 minutes
   const [showDomainInstructions, setShowDomainInstructions] = useState(false);
   const [newCustomDomain, setNewCustomDomain] = useState("");
+  const [addingDomain, setAddingDomain] = useState(false);
 
   const price = selectedPlan === "basic" ? 5 : 10;
 
@@ -87,15 +90,21 @@ const CreateLinkModal = ({ open, onOpenChange, initialUrl = "" }: CreateLinkModa
   };
 
   const fetchDomains = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    // Fetch user's own domains
     const { data, error } = await supabase
       .from("custom_domains")
       .select("*")
-      .eq("is_active", true)
-      .eq("is_verified", true);
+      .eq("is_active", true);
 
     if (data && data.length > 0) {
-      setDomains(data as CustomDomain[]);
-      setSelectedDomain(data[0].domain);
+      // Filter to show only user's domains (or admin can see all)
+      const userDomains = user ? data.filter(d => d.user_id === user.id || d.user_id === null) : [];
+      setDomains(userDomains as CustomDomain[]);
+      if (userDomains.length > 0) {
+        setSelectedDomain(userDomains[0].domain);
+      }
     }
     if (error) toast.error("Failed to load domains");
   };
@@ -123,6 +132,60 @@ const CreateLinkModal = ({ open, onOpenChange, initialUrl = "" }: CreateLinkModa
       return `https://${url}`;
     }
     return url;
+  };
+
+  const handleAddDomain = async () => {
+    if (!newCustomDomain.trim()) {
+      toast.error("Please enter a domain");
+      return;
+    }
+
+    // Basic domain validation
+    const domainRegex = /^[a-zA-Z0-9][a-zA-Z0-9-]{0,61}[a-zA-Z0-9]?\.[a-zA-Z]{2,}$/;
+    if (!domainRegex.test(newCustomDomain.trim())) {
+      toast.error("Please enter a valid domain (e.g., example.com)");
+      return;
+    }
+
+    setAddingDomain(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        toast.error("Please login to add a custom domain");
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from("custom_domains")
+        .insert({
+          domain: newCustomDomain.trim().toLowerCase(),
+          user_id: user.id,
+          is_active: true,
+          is_verified: false,
+        })
+        .select()
+        .single();
+
+      if (error) {
+        if (error.code === '23505') {
+          toast.error("This domain is already registered");
+        } else {
+          throw error;
+        }
+        return;
+      }
+
+      toast.success("Domain added! Contact admin to verify it.");
+      setNewCustomDomain("");
+      setDomains([...domains, data as CustomDomain]);
+      setSelectedDomain(data.domain);
+      setShowDomainInstructions(false);
+    } catch (error: any) {
+      toast.error(error.message || "Failed to add domain");
+    } finally {
+      setAddingDomain(false);
+    }
   };
 
   const handleCreateLink = async () => {
@@ -269,7 +332,7 @@ const CreateLinkModal = ({ open, onOpenChange, initialUrl = "" }: CreateLinkModa
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-md glass border-border">
+      <DialogContent className="sm:max-w-md glass border-border max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="font-heading text-xl">
             {step === "input" && "Create New Link"}
@@ -336,21 +399,27 @@ const CreateLinkModal = ({ open, onOpenChange, initialUrl = "" }: CreateLinkModa
                 </div>
               ) : (
                 <div className="space-y-2">
-                  <Select value={selectedDomain} onValueChange={setSelectedDomain}>
-                    <SelectTrigger className="bg-input border-border">
-                      <SelectValue placeholder="Select a domain" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {domains.map((domain) => (
-                        <SelectItem key={domain.id} value={domain.domain}>
-                          <div className="flex items-center gap-2">
-                            <Globe className="w-4 h-4" />
-                            {domain.domain}
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  {domains.length > 0 && (
+                    <Select value={selectedDomain} onValueChange={setSelectedDomain}>
+                      <SelectTrigger className="bg-input border-border">
+                        <SelectValue placeholder="Select a domain" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {domains.map((domain) => (
+                          <SelectItem key={domain.id} value={domain.domain}>
+                            <div className="flex items-center gap-2">
+                              <Globe className="w-4 h-4" />
+                              {domain.domain}
+                              {!domain.is_verified && (
+                                <span className="text-xs text-amber-500">(pending verification)</span>
+                              )}
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                  
                   <Button
                     type="button"
                     variant="outline"
@@ -364,6 +433,31 @@ const CreateLinkModal = ({ open, onOpenChange, initialUrl = "" }: CreateLinkModa
                   
                   {showDomainInstructions && (
                     <div className="p-4 bg-secondary/50 rounded-lg border border-border space-y-3">
+                      {/* Domain Input */}
+                      <div className="space-y-2">
+                        <Label htmlFor="newDomain">Enter Your Domain</Label>
+                        <div className="flex gap-2">
+                          <Input
+                            id="newDomain"
+                            placeholder="example.com"
+                            value={newCustomDomain}
+                            onChange={(e) => setNewCustomDomain(e.target.value)}
+                            className="bg-input border-border flex-1"
+                          />
+                          <Button
+                            onClick={handleAddDomain}
+                            disabled={addingDomain || !newCustomDomain.trim()}
+                            size="sm"
+                          >
+                            {addingDomain ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              "Add"
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+
                       <div className="flex items-center gap-2 text-sm font-medium text-foreground">
                         <Settings className="w-4 h-4 text-primary" />
                         DNS Configuration Instructions
@@ -392,7 +486,11 @@ const CreateLinkModal = ({ open, onOpenChange, initialUrl = "" }: CreateLinkModa
                         </div>
                       </div>
                       <div className="p-2 bg-primary/10 rounded text-xs text-muted-foreground">
-                        <strong className="text-foreground">Note:</strong> After configuring DNS, contact support to verify and activate your domain. DNS propagation may take up to 48 hours.
+                        <strong className="text-foreground">Note:</strong> After adding your domain, contact admin on{" "}
+                        <a href={TELEGRAM_CONTACT} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                          Telegram
+                        </a>{" "}
+                        to verify and activate it.
                       </div>
                     </div>
                   )}
@@ -464,6 +562,19 @@ const CreateLinkModal = ({ open, onOpenChange, initialUrl = "" }: CreateLinkModa
                 "Proceed to Payment"
               )}
             </Button>
+
+            {/* Contact Admin */}
+            <div className="text-center pt-2">
+              <a
+                href={TELEGRAM_CONTACT}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors"
+              >
+                <Send className="w-4 h-4" />
+                Need help? Contact Admin
+              </a>
+            </div>
           </div>
         )}
 
@@ -527,6 +638,19 @@ const CreateLinkModal = ({ open, onOpenChange, initialUrl = "" }: CreateLinkModa
                 "I've Sent the Payment"
               )}
             </Button>
+
+            {/* Contact Admin */}
+            <div className="text-center">
+              <a
+                href={TELEGRAM_CONTACT}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors"
+              >
+                <Send className="w-4 h-4" />
+                Need help? Contact Admin
+              </a>
+            </div>
           </div>
         )}
 

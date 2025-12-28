@@ -1,5 +1,7 @@
 import { Link } from "react-router-dom";
-import { Link2, Twitter, Github, Mail } from "lucide-react";
+import { Link2, Twitter, Github, Mail, Send } from "lucide-react";
+
+const TELEGRAM_CONTACT = "https://t.me/STORMTOOLS101";
 
 const Footer = () => {
   return (
@@ -20,6 +22,15 @@ const Footer = () => {
               Professional link shortening powered by cryptocurrency.
             </p>
             <div className="flex items-center gap-4">
+              <a
+                href={TELEGRAM_CONTACT}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-muted-foreground hover:text-primary transition-colors"
+                title="Contact Admin on Telegram"
+              >
+                <Send className="w-5 h-5" />
+              </a>
               <a
                 href="#"
                 className="text-muted-foreground hover:text-primary transition-colors"
@@ -77,8 +88,14 @@ const Footer = () => {
                 </a>
               </li>
               <li>
-                <a href="#" className="text-muted-foreground hover:text-foreground transition-colors text-sm">
-                  Contact
+                <a
+                  href={TELEGRAM_CONTACT}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-muted-foreground hover:text-foreground transition-colors text-sm inline-flex items-center gap-1"
+                >
+                  Contact Us
+                  <Send className="w-3 h-3" />
                 </a>
               </li>
             </ul>
@@ -110,9 +127,20 @@ const Footer = () => {
           <p className="text-sm text-muted-foreground">
             © {new Date().getFullYear()} CustomsLinks. All rights reserved.
           </p>
-          <p className="text-sm text-muted-foreground">
-            Default domain: customslinks.com
-          </p>
+          <div className="flex items-center gap-4">
+            <a
+              href={TELEGRAM_CONTACT}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-muted-foreground hover:text-primary transition-colors inline-flex items-center gap-1"
+            >
+              <Send className="w-4 h-4" />
+              Contact Admin
+            </a>
+            <p className="text-sm text-muted-foreground">
+              Default domain: customslinks.com
+            </p>
+          </div>
         </div>
       </div>
     </footer>
