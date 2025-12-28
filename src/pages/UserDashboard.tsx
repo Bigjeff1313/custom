@@ -1,8 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Table,
   TableBody,
@@ -16,15 +14,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Link2,
   LogOut,
@@ -42,22 +32,15 @@ import {
   Tablet,
   MapPin,
   Eye,
-  Globe,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { Tables } from "@/integrations/supabase/types";
 import { User as SupabaseUser } from "@supabase/supabase-js";
+import CreateLinkModal from "@/components/CreateLinkModal";
 
 type Link = Tables<"links">;
 type LinkClick = Tables<"link_clicks">;
-
-interface CustomDomain {
-  id: string;
-  domain: string;
-  is_verified: boolean;
-  is_active: boolean;
-}
 
 interface LinkWithClicks extends Link {
   clicks?: LinkClick[];
@@ -65,18 +48,12 @@ interface LinkWithClicks extends Link {
 
 const UserDashboard = () => {
   const [links, setLinks] = useState<LinkWithClicks[]>([]);
-  const [domains, setDomains] = useState<CustomDomain[]>([]);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [selectedLink, setSelectedLink] = useState<LinkWithClicks | null>(null);
   const [clicksDialogOpen, setClicksDialogOpen] = useState(false);
-  const [newLink, setNewLink] = useState({
-    original_url: "",
-    custom_domain: "customtextx.com",
-    short_code: "",
-  });
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -110,7 +87,7 @@ const UserDashboard = () => {
 
   const fetchData = async (userId: string) => {
     setLoading(true);
-    await Promise.all([fetchLinks(userId), fetchDomains()]);
+    await fetchLinks(userId);
     setLoading(false);
   };
 
@@ -124,17 +101,6 @@ const UserDashboard = () => {
 
     if (data) setLinks(data);
     if (error) toast.error("Failed to load links");
-  };
-
-  const fetchDomains = async () => {
-    const { data, error } = await supabase
-      .from("custom_domains")
-      .select("*")
-      .eq("is_active", true)
-      .eq("is_verified", true);
-
-    if (data) setDomains(data as CustomDomain[]);
-    if (error) toast.error("Failed to load domains");
   };
 
   const fetchClicksForLink = async (linkId: string) => {
@@ -163,53 +129,7 @@ const UserDashboard = () => {
     navigate("/");
   };
 
-  const generateShortCode = () => {
-    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-    let result = "";
-    for (let i = 0; i < 6; i++) {
-      result += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return result;
-  };
-
-  const handleCreateLink = async () => {
-    if (!newLink.original_url) {
-      toast.error("Please enter a URL");
-      return;
-    }
-
-    if (!user) {
-      toast.error("You must be logged in");
-      return;
-    }
-
-    let url = newLink.original_url;
-    if (!url.startsWith("http://") && !url.startsWith("https://")) {
-      url = "https://" + url;
-    }
-
-    const shortCode = newLink.short_code || generateShortCode();
-
-    const { error } = await supabase.from("links").insert({
-      original_url: url,
-      short_code: shortCode,
-      custom_domain: newLink.custom_domain,
-      status: "pending_payment",
-      plan_type: "basic",
-      user_id: user.id,
-    });
-
-    if (error) {
-      if (error.code === "23505") {
-        toast.error("This short code already exists");
-      } else {
-        toast.error("Failed to create link");
-      }
-      return;
-    }
-
-    toast.success("Link created successfully!");
-    setNewLink({ original_url: "", custom_domain: "customtextx.com", short_code: "" });
+  const handleLinkCreated = () => {
     setCreateDialogOpen(false);
     if (user) fetchLinks(user.id);
   };
@@ -345,64 +265,19 @@ const UserDashboard = () => {
         <div className="space-y-4">
           <div className="flex justify-between items-center">
             <h2 className="font-heading text-lg font-semibold text-foreground">My Links</h2>
-            <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-              <DialogTrigger asChild>
-                <Button variant="pricing">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Create Link
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="glass border-border">
-                <DialogHeader>
-                  <DialogTitle>Create New Link</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label>Original URL</Label>
-                    <Input
-                      placeholder="https://example.com/your-long-url"
-                      value={newLink.original_url}
-                      onChange={(e) => setNewLink({ ...newLink, original_url: e.target.value })}
-                      className="bg-input border-border"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Domain</Label>
-                    <Select
-                      value={newLink.custom_domain}
-                      onValueChange={(value) => setNewLink({ ...newLink, custom_domain: value })}
-                    >
-                      <SelectTrigger className="bg-input border-border">
-                        <SelectValue placeholder="Select domain" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {domains.map((domain) => (
-                          <SelectItem key={domain.id} value={domain.domain}>
-                            {domain.domain}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Custom Short Code (optional)</Label>
-                    <Input
-                      placeholder="my-link"
-                      value={newLink.short_code}
-                      onChange={(e) => setNewLink({ ...newLink, short_code: e.target.value })}
-                      className="bg-input border-border"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Leave empty for auto-generated code
-                    </p>
-                  </div>
-                  <Button onClick={handleCreateLink} className="w-full" variant="pricing">
-                    Create Link
-                  </Button>
-                </div>
-              </DialogContent>
-            </Dialog>
+            <Button variant="pricing" onClick={() => setCreateDialogOpen(true)}>
+              <Plus className="w-4 h-4 mr-2" />
+              Create Link
+            </Button>
           </div>
+
+          <CreateLinkModal
+            open={createDialogOpen}
+            onOpenChange={(open) => {
+              setCreateDialogOpen(open);
+              if (!open && user) fetchLinks(user.id);
+            }}
+          />
 
           <div className="glass rounded-xl overflow-hidden">
             <Table>
