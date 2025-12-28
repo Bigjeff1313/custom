@@ -253,11 +253,6 @@ const AdminDashboard = () => {
   };
 
   const fetchUsers = async (linksData: Link[]) => {
-    // Call edge function to get users list
-    const { data, error } = await supabase.functions.invoke("mysql-api", {
-      body: { action: "list-users" },
-    });
-
     // Create a map of user_id to their links
     const userLinksMap = new Map<string, Link[]>();
     linksData.forEach((link) => {
@@ -268,7 +263,13 @@ const AdminDashboard = () => {
       }
     });
 
-    if (error) {
+    // Call edge function to get users list
+    const { data, error } = await supabase.functions.invoke("admin-users", {
+      body: { action: "list-users" },
+    });
+
+    if (error || !data?.success) {
+      console.error("Failed to fetch users:", error || data?.error);
       // Fallback: just get roles from user_roles table
       const { data: rolesData, error: rolesError } = await supabase
         .from("user_roles")
