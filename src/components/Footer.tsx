@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { Link2, Twitter, Github, Mail, Send } from "lucide-react";
 
-const TELEGRAM_CONTACT = "https://t.me/STORMTOOLS101";
+const TELEGRAM_CONTACT = "https://t.me/samwebber231";
 
 const Footer = () => {
   return (

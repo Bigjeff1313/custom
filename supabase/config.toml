@@ -20,3 +20,6 @@ verify_jwt = false
 
 [functions.stats-api]
 verify_jwt = false
+
+[functions.telegram-notify]
+verify_jwt = false
