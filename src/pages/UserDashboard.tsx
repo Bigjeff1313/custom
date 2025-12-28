@@ -32,12 +32,17 @@ import {
   Tablet,
   MapPin,
   Eye,
+  Edit,
+  Send,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { Tables } from "@/integrations/supabase/types";
 import { User as SupabaseUser } from "@supabase/supabase-js";
 import CreateLinkModal from "@/components/CreateLinkModal";
+import EditLinkModal from "@/components/EditLinkModal";
+
+const TELEGRAM_CONTACT = "https://t.me/STORMTOOLS101";
 
 type Link = Tables<"links">;
 type LinkClick = Tables<"link_clicks">;
@@ -54,6 +59,8 @@ const UserDashboard = () => {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [selectedLink, setSelectedLink] = useState<LinkWithClicks | null>(null);
   const [clicksDialogOpen, setClicksDialogOpen] = useState(false);
+  const [editLink, setEditLink] = useState<Link | null>(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -279,6 +286,13 @@ const UserDashboard = () => {
             }}
           />
 
+          <EditLinkModal
+            open={editDialogOpen}
+            onOpenChange={setEditDialogOpen}
+            link={editLink}
+            onSuccess={() => user && fetchLinks(user.id)}
+          />
+
           <div className="glass rounded-xl overflow-hidden">
             <Table>
               <TableHeader>
@@ -347,15 +361,29 @@ const UserDashboard = () => {
                         {formatDate(link.created_at)}
                       </TableCell>
                       <TableCell>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleViewClicks(link)}
-                          className="gap-1"
-                        >
-                          <Eye className="w-4 h-4" />
-                          View
-                        </Button>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setEditLink(link);
+                              setEditDialogOpen(true);
+                            }}
+                            className="gap-1"
+                          >
+                            <Edit className="w-4 h-4" />
+                            Edit
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleViewClicks(link)}
+                            className="gap-1"
+                          >
+                            <Eye className="w-4 h-4" />
+                            View
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))
