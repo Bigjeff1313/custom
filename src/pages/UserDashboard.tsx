@@ -37,7 +37,12 @@ import {
   MousePointerClick,
   TrendingUp,
   Home,
-  User,
+  Monitor,
+  Smartphone,
+  Tablet,
+  MapPin,
+  Eye,
+  Globe,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -45,6 +50,7 @@ import type { Tables } from "@/integrations/supabase/types";
 import { User as SupabaseUser } from "@supabase/supabase-js";
 
 type Link = Tables<"links">;
+type LinkClick = Tables<"link_clicks">;
 
 interface CustomDomain {
   id: string;
@@ -53,13 +59,19 @@ interface CustomDomain {
   is_active: boolean;
 }
 
+interface LinkWithClicks extends Link {
+  clicks?: LinkClick[];
+}
+
 const UserDashboard = () => {
-  const [links, setLinks] = useState<Link[]>([]);
+  const [links, setLinks] = useState<LinkWithClicks[]>([]);
   const [domains, setDomains] = useState<CustomDomain[]>([]);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [selectedLink, setSelectedLink] = useState<LinkWithClicks | null>(null);
+  const [clicksDialogOpen, setClicksDialogOpen] = useState(false);
   const [newLink, setNewLink] = useState({
     original_url: "",
     custom_domain: "customtextx.com",
@@ -93,19 +105,21 @@ const UserDashboard = () => {
       return;
     }
 
-    fetchData();
+    fetchData(session.user.id);
   };
 
-  const fetchData = async () => {
+  const fetchData = async (userId: string) => {
     setLoading(true);
-    await Promise.all([fetchLinks(), fetchDomains()]);
+    await Promise.all([fetchLinks(userId), fetchDomains()]);
     setLoading(false);
   };
 
-  const fetchLinks = async () => {
+  const fetchLinks = async (userId: string) => {
+    // Fetch only links belonging to this user
     const { data, error } = await supabase
       .from("links")
       .select("*")
+      .eq("user_id", userId)
       .order("created_at", { ascending: false });
 
     if (data) setLinks(data);
@@ -121,6 +135,27 @@ const UserDashboard = () => {
 
     if (data) setDomains(data as CustomDomain[]);
     if (error) toast.error("Failed to load domains");
+  };
+
+  const fetchClicksForLink = async (linkId: string) => {
+    const { data, error } = await supabase
+      .from("link_clicks")
+      .select("*")
+      .eq("link_id", linkId)
+      .order("clicked_at", { ascending: false })
+      .limit(50);
+
+    if (error) {
+      toast.error("Failed to load click data");
+      return [];
+    }
+    return data || [];
+  };
+
+  const handleViewClicks = async (link: LinkWithClicks) => {
+    const clicks = await fetchClicksForLink(link.id);
+    setSelectedLink({ ...link, clicks });
+    setClicksDialogOpen(true);
   };
 
   const handleLogout = async () => {
@@ -143,6 +178,11 @@ const UserDashboard = () => {
       return;
     }
 
+    if (!user) {
+      toast.error("You must be logged in");
+      return;
+    }
+
     let url = newLink.original_url;
     if (!url.startsWith("http://") && !url.startsWith("https://")) {
       url = "https://" + url;
@@ -156,6 +196,7 @@ const UserDashboard = () => {
       custom_domain: newLink.custom_domain,
       status: "pending_payment",
       plan_type: "basic",
+      user_id: user.id,
     });
 
     if (error) {
@@ -170,7 +211,7 @@ const UserDashboard = () => {
     toast.success("Link created successfully!");
     setNewLink({ original_url: "", custom_domain: "customtextx.com", short_code: "" });
     setCreateDialogOpen(false);
-    fetchLinks();
+    if (user) fetchLinks(user.id);
   };
 
   const copyToClipboard = (text: string, id: string) => {
@@ -188,6 +229,16 @@ const UserDashboard = () => {
     });
   };
 
+  const formatDateTime = (date: string) => {
+    return new Date(date).toLocaleString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case "active":
@@ -198,6 +249,17 @@ const UserDashboard = () => {
         return "text-red-500 bg-red-500/10";
       default:
         return "text-muted-foreground bg-muted";
+    }
+  };
+
+  const getDeviceIcon = (deviceType: string | null) => {
+    switch (deviceType) {
+      case "mobile":
+        return <Smartphone className="w-4 h-4" />;
+      case "tablet":
+        return <Tablet className="w-4 h-4" />;
+      default:
+        return <Monitor className="w-4 h-4" />;
     }
   };
 
@@ -230,7 +292,7 @@ const UserDashboard = () => {
             <Button variant="ghost" size="icon" onClick={() => navigate("/")}>
               <Home className="w-4 h-4" />
             </Button>
-            <Button variant="ghost" size="icon" onClick={fetchData}>
+            <Button variant="ghost" size="icon" onClick={() => user && fetchData(user.id)}>
               <RefreshCw className="w-4 h-4" />
             </Button>
             <Button variant="ghost" onClick={handleLogout}>
@@ -250,7 +312,7 @@ const UserDashboard = () => {
                 <Link2 className="w-6 h-6 text-primary" />
               </div>
               <div>
-                <p className="text-muted-foreground text-sm">Total Links</p>
+                <p className="text-muted-foreground text-sm">My Links</p>
                 <p className="text-2xl font-bold text-foreground">{links.length}</p>
               </div>
             </div>
@@ -351,12 +413,13 @@ const UserDashboard = () => {
                   <TableHead className="text-muted-foreground">Status</TableHead>
                   <TableHead className="text-muted-foreground">Clicks</TableHead>
                   <TableHead className="text-muted-foreground">Created</TableHead>
+                  <TableHead className="text-muted-foreground">Analytics</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {links.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                       No links yet. Create your first link!
                     </TableCell>
                   </TableRow>
@@ -408,6 +471,17 @@ const UserDashboard = () => {
                       <TableCell className="text-muted-foreground text-sm">
                         {formatDate(link.created_at)}
                       </TableCell>
+                      <TableCell>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleViewClicks(link)}
+                          className="gap-1"
+                        >
+                          <Eye className="w-4 h-4" />
+                          View
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   ))
                 )}
@@ -416,6 +490,92 @@ const UserDashboard = () => {
           </div>
         </div>
       </div>
+
+      {/* Click Analytics Dialog */}
+      <Dialog open={clicksDialogOpen} onOpenChange={setClicksDialogOpen}>
+        <DialogContent className="glass border-border max-w-3xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MousePointerClick className="w-5 h-5 text-primary" />
+              Click Analytics
+            </DialogTitle>
+          </DialogHeader>
+          {selectedLink && (
+            <div className="space-y-4">
+              {/* Link Info */}
+              <div className="bg-muted/50 rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Link2 className="w-4 h-4 text-primary" />
+                  <code className="text-sm text-primary font-mono">
+                    {selectedLink.custom_domain}/{selectedLink.short_code}
+                  </code>
+                </div>
+                <p className="text-sm text-muted-foreground truncate">
+                  {selectedLink.original_url}
+                </p>
+                <div className="flex items-center gap-4 mt-2 text-sm">
+                  <span className="text-foreground font-medium">
+                    {selectedLink.click_count} total clicks
+                  </span>
+                </div>
+              </div>
+
+              {/* Clicks Table */}
+              <div className="rounded-lg border border-border overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-border">
+                      <TableHead className="text-muted-foreground">Time</TableHead>
+                      <TableHead className="text-muted-foreground">Device</TableHead>
+                      <TableHead className="text-muted-foreground">Browser</TableHead>
+                      <TableHead className="text-muted-foreground">OS</TableHead>
+                      <TableHead className="text-muted-foreground">Location</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {(!selectedLink.clicks || selectedLink.clicks.length === 0) ? (
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                          No clicks recorded yet
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      selectedLink.clicks.map((click) => (
+                        <TableRow key={click.id} className="border-border">
+                          <TableCell className="text-sm text-muted-foreground">
+                            {formatDateTime(click.clicked_at)}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2 text-sm">
+                              {getDeviceIcon(click.device_type)}
+                              <span className="capitalize">{click.device_type || 'Unknown'}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {click.browser || 'Unknown'}
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {click.os || 'Unknown'}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2 text-sm">
+                              <MapPin className="w-3 h-3 text-primary" />
+                              <span>
+                                {click.city && click.city !== 'Unknown' ? `${click.city}, ` : ''}
+                                {click.country || 'Unknown'}
+                              </span>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

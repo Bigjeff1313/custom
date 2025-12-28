@@ -65,6 +65,56 @@ export type Database = {
         }
         Relationships: []
       }
+      link_clicks: {
+        Row: {
+          browser: string | null
+          city: string | null
+          clicked_at: string
+          country: string | null
+          device_type: string | null
+          id: string
+          ip_address: string | null
+          link_id: string
+          os: string | null
+          region: string | null
+          user_agent: string | null
+        }
+        Insert: {
+          browser?: string | null
+          city?: string | null
+          clicked_at?: string
+          country?: string | null
+          device_type?: string | null
+          id?: string
+          ip_address?: string | null
+          link_id: string
+          os?: string | null
+          region?: string | null
+          user_agent?: string | null
+        }
+        Update: {
+          browser?: string | null
+          city?: string | null
+          clicked_at?: string
+          country?: string | null
+          device_type?: string | null
+          id?: string
+          ip_address?: string | null
+          link_id?: string
+          os?: string | null
+          region?: string | null
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "link_clicks_link_id_fkey"
+            columns: ["link_id"]
+            isOneToOne: false
+            referencedRelation: "links"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       links: {
         Row: {
           click_count: number | null
@@ -76,6 +126,7 @@ export type Database = {
           short_code: string
           status: Database["public"]["Enums"]["link_status"]
           updated_at: string
+          user_id: string | null
         }
         Insert: {
           click_count?: number | null
@@ -87,6 +138,7 @@ export type Database = {
           short_code: string
           status?: Database["public"]["Enums"]["link_status"]
           updated_at?: string
+          user_id?: string | null
         }
         Update: {
           click_count?: number | null
@@ -98,6 +150,7 @@ export type Database = {
           short_code?: string
           status?: Database["public"]["Enums"]["link_status"]
           updated_at?: string
+          user_id?: string | null
         }
         Relationships: []
       }
