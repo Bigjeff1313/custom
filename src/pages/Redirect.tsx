@@ -61,11 +61,12 @@ const Redirect = () => {
     setState("verifying");
 
     try {
-      // Call the redirect function to increment click and get URL
+      // Call the redirect function to increment click and get URL with device info
       const { data, error: fnError } = await supabase.functions.invoke('redirect', {
         body: { 
           shortCode,
-          domain: window.location.hostname 
+          domain: window.location.hostname,
+          userAgent: navigator.userAgent,
         }
       });
 

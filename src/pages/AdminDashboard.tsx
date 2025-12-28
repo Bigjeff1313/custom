@@ -64,6 +64,11 @@ import {
   Users,
   Shield,
   UserPlus,
+  Eye,
+  Monitor,
+  Smartphone,
+  Tablet,
+  MapPin,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -72,6 +77,7 @@ import type { Tables, Enums } from "@/integrations/supabase/types";
 type Link = Tables<"links">;
 type Payment = Tables<"payments">;
 type CryptoWallet = Tables<"crypto_wallets">;
+type LinkClick = Tables<"link_clicks">;
 type AppRole = Enums<"app_role">;
 
 interface CustomDomain {
@@ -88,6 +94,12 @@ interface UserWithRole {
   email: string;
   created_at: string;
   role: AppRole | null;
+  linkCount?: number;
+  totalClicks?: number;
+}
+
+interface LinkWithClicks extends Link {
+  clicks?: LinkClick[];
 }
 
 const AdminDashboard = () => {
@@ -96,15 +108,20 @@ const AdminDashboard = () => {
   const [wallets, setWallets] = useState<CryptoWallet[]>([]);
   const [domains, setDomains] = useState<CustomDomain[]>([]);
   const [users, setUsers] = useState<UserWithRole[]>([]);
+  const [allClicks, setAllClicks] = useState<LinkClick[]>([]);
   const [loading, setLoading] = useState(true);
   const [walletDialogOpen, setWalletDialogOpen] = useState(false);
   const [domainDialogOpen, setDomainDialogOpen] = useState(false);
   const [userDialogOpen, setUserDialogOpen] = useState(false);
+  const [linkDialogOpen, setLinkDialogOpen] = useState(false);
+  const [clicksDialogOpen, setClicksDialogOpen] = useState(false);
+  const [selectedLink, setSelectedLink] = useState<LinkWithClicks | null>(null);
   const [editingWallet, setEditingWallet] = useState<CryptoWallet | null>(null);
   const [editingDomain, setEditingDomain] = useState<CustomDomain | null>(null);
   const [newWallet, setNewWallet] = useState({ currency: "", wallet_address: "" });
   const [newDomain, setNewDomain] = useState("");
   const [newUser, setNewUser] = useState({ email: "", password: "", role: "user" as AppRole });
+  const [newLink, setNewLink] = useState({ original_url: "", custom_domain: "customtextx.com", short_code: "", user_id: "" });
   const [copied, setCopied] = useState<string | null>(null);
   const navigate = useNavigate();
 
@@ -137,7 +154,7 @@ const AdminDashboard = () => {
 
   const fetchData = async () => {
     setLoading(true);
-    await Promise.all([fetchLinks(), fetchPayments(), fetchWallets(), fetchDomains(), fetchUsers()]);
+    await Promise.all([fetchLinks(), fetchPayments(), fetchWallets(), fetchDomains(), fetchUsers(), fetchAllClicks()]);
     setLoading(false);
   };
 
@@ -207,6 +224,104 @@ const AdminDashboard = () => {
     } else if (data?.users) {
       setUsers(data.users);
     }
+  };
+
+  const fetchAllClicks = async () => {
+    const { data, error } = await supabase
+      .from("link_clicks")
+      .select("*")
+      .order("clicked_at", { ascending: false })
+      .limit(100);
+
+    if (data) setAllClicks(data);
+    if (error) console.error("Failed to load clicks");
+  };
+
+  const fetchClicksForLink = async (linkId: string) => {
+    const { data, error } = await supabase
+      .from("link_clicks")
+      .select("*")
+      .eq("link_id", linkId)
+      .order("clicked_at", { ascending: false })
+      .limit(50);
+
+    if (error) {
+      toast.error("Failed to load click data");
+      return [];
+    }
+    return data || [];
+  };
+
+  const handleViewClicks = async (link: Link) => {
+    const clicks = await fetchClicksForLink(link.id);
+    setSelectedLink({ ...link, clicks });
+    setClicksDialogOpen(true);
+  };
+
+  const generateShortCode = () => {
+    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+    let result = "";
+    for (let i = 0; i < 6; i++) {
+      result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
+  };
+
+  const handleCreateLink = async () => {
+    if (!newLink.original_url) {
+      toast.error("Please enter a URL");
+      return;
+    }
+
+    let url = newLink.original_url;
+    if (!url.startsWith("http://") && !url.startsWith("https://")) {
+      url = "https://" + url;
+    }
+
+    const shortCode = newLink.short_code || generateShortCode();
+
+    const { error } = await supabase.from("links").insert({
+      original_url: url,
+      short_code: shortCode,
+      custom_domain: newLink.custom_domain,
+      status: "active",
+      plan_type: "basic",
+      user_id: newLink.user_id || null,
+    });
+
+    if (error) {
+      if (error.code === "23505") {
+        toast.error("This short code already exists");
+      } else {
+        toast.error("Failed to create link");
+      }
+      return;
+    }
+
+    toast.success("Link created successfully!");
+    setNewLink({ original_url: "", custom_domain: "customtextx.com", short_code: "", user_id: "" });
+    setLinkDialogOpen(false);
+    fetchLinks();
+  };
+
+  const getDeviceIcon = (deviceType: string | null) => {
+    switch (deviceType) {
+      case "mobile":
+        return <Smartphone className="w-4 h-4" />;
+      case "tablet":
+        return <Tablet className="w-4 h-4" />;
+      default:
+        return <Monitor className="w-4 h-4" />;
+    }
+  };
+
+  const formatDateTime = (date: string) => {
+    return new Date(date).toLocaleString("en-US", {
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
   };
 
   const handleLogout = async () => {
@@ -619,7 +734,39 @@ const AdminDashboard = () => {
           <TabsContent value="links" className="space-y-4">
             <div className="flex justify-between items-center">
               <h2 className="font-heading text-lg font-semibold text-foreground">All Links</h2>
-              <p className="text-sm text-muted-foreground">{links.length} total</p>
+              <Dialog open={linkDialogOpen} onOpenChange={setLinkDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="pricing">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Create Link
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="glass border-border">
+                  <DialogHeader>
+                    <DialogTitle>Create New Link</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>Original URL</Label>
+                      <Input placeholder="https://example.com/long-url" value={newLink.original_url} onChange={(e) => setNewLink({ ...newLink, original_url: e.target.value })} className="bg-input border-border" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Domain</Label>
+                      <Select value={newLink.custom_domain} onValueChange={(value) => setNewLink({ ...newLink, custom_domain: value })}>
+                        <SelectTrigger className="bg-input border-border"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {domains.map((d) => <SelectItem key={d.id} value={d.domain}>{d.domain}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Short Code (optional)</Label>
+                      <Input placeholder="my-link" value={newLink.short_code} onChange={(e) => setNewLink({ ...newLink, short_code: e.target.value })} className="bg-input border-border" />
+                    </div>
+                    <Button onClick={handleCreateLink} className="w-full" variant="pricing">Create Link</Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
             </div>
             <div className="glass rounded-xl overflow-hidden">
               <Table>
@@ -685,13 +832,11 @@ const AdminDashboard = () => {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-2">
-                            <Select
-                              value={link.status}
-                              onValueChange={(value) => handleUpdateLinkStatus(link.id, value as Link["status"])}
-                            >
-                              <SelectTrigger className="w-28 h-8 text-xs bg-input border-border">
-                                <SelectValue />
-                              </SelectTrigger>
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleViewClicks(link)}>
+                              <Eye className="w-4 h-4" />
+                            </Button>
+                            <Select value={link.status} onValueChange={(value) => handleUpdateLinkStatus(link.id, value as Link["status"])}>
+                              <SelectTrigger className="w-28 h-8 text-xs bg-input border-border"><SelectValue /></SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="pending_payment">Pending</SelectItem>
                                 <SelectItem value="active">Active</SelectItem>
@@ -700,22 +845,16 @@ const AdminDashboard = () => {
                             </Select>
                             <AlertDialog>
                               <AlertDialogTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive">
-                                  <Trash2 className="w-4 h-4" />
-                                </Button>
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive"><Trash2 className="w-4 h-4" /></Button>
                               </AlertDialogTrigger>
                               <AlertDialogContent className="glass border-border">
                                 <AlertDialogHeader>
                                   <AlertDialogTitle>Delete Link</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    Are you sure you want to delete this link? This action cannot be undone.
-                                  </AlertDialogDescription>
+                                  <AlertDialogDescription>Are you sure? This cannot be undone.</AlertDialogDescription>
                                 </AlertDialogHeader>
                                 <AlertDialogFooter>
                                   <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction onClick={() => handleDeleteLink(link.id)} className="bg-destructive text-destructive-foreground">
-                                    Delete
-                                  </AlertDialogAction>
+                                  <AlertDialogAction onClick={() => handleDeleteLink(link.id)} className="bg-destructive text-destructive-foreground">Delete</AlertDialogAction>
                                 </AlertDialogFooter>
                               </AlertDialogContent>
                             </AlertDialog>
