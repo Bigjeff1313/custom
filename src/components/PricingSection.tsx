@@ -44,10 +44,8 @@ const cryptos = [
 
 const PricingSection = () => {
   const [modalOpen, setModalOpen] = useState(false);
-  const [selectedPlan, setSelectedPlan] = useState<"basic" | "pro">("basic");
 
-  const handleGetStarted = (planName: string) => {
-    setSelectedPlan(planName === "Pro Link" ? "pro" : "basic");
+  const handleGetStarted = () => {
     setModalOpen(true);
   };
 
@@ -56,7 +54,6 @@ const PricingSection = () => {
       <CreateLinkModal
         open={modalOpen}
         onOpenChange={setModalOpen}
-        planType={selectedPlan}
       />
     <section id="pricing" className="py-24 relative">
       {/* Background Effect */}
@@ -117,7 +114,7 @@ const PricingSection = () => {
                 ))}
               </ul>
 
-              <Button variant="pricing" size="lg" onClick={() => handleGetStarted(plan.name)}>
+              <Button variant="pricing" size="lg" onClick={handleGetStarted}>
                 Get Started
               </Button>
             </div>

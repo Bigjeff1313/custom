@@ -17,7 +17,6 @@ import { toast } from "sonner";
 interface CreateLinkModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  planType: "basic" | "pro";
 }
 
 interface CryptoWallet {
@@ -33,10 +32,14 @@ interface CustomDomain {
   is_active: boolean;
 }
 
-const CreateLinkModal = ({ open, onOpenChange, planType }: CreateLinkModalProps) => {
+const DEFAULT_DOMAIN = "customtextx.com";
+
+const CreateLinkModal = ({ open, onOpenChange }: CreateLinkModalProps) => {
   const [step, setStep] = useState<"input" | "payment" | "success">("input");
   const [originalUrl, setOriginalUrl] = useState("");
-  const [selectedDomain, setSelectedDomain] = useState<string>("");
+  const [selectedPlan, setSelectedPlan] = useState<"basic" | "pro">("basic");
+  const [selectedDomain, setSelectedDomain] = useState<string>(DEFAULT_DOMAIN);
+  const [customShortCode, setCustomShortCode] = useState("");
   const [selectedCrypto, setSelectedCrypto] = useState<string>("");
   const [wallets, setWallets] = useState<CryptoWallet[]>([]);
   const [domains, setDomains] = useState<CustomDomain[]>([]);
@@ -46,7 +49,7 @@ const CreateLinkModal = ({ open, onOpenChange, planType }: CreateLinkModalProps)
   const [selectedWallet, setSelectedWallet] = useState<CryptoWallet | null>(null);
   const [timeLeft, setTimeLeft] = useState(900); // 15 minutes
 
-  const price = planType === "basic" ? 5 : 10;
+  const price = selectedPlan === "basic" ? 5 : 10;
 
   useEffect(() => {
     if (open) {
@@ -135,8 +138,11 @@ const CreateLinkModal = ({ open, onOpenChange, planType }: CreateLinkModalProps)
     setLoading(true);
 
     try {
-      const shortCode = generateShortCode();
+      const shortCode = customShortCode.trim() || generateShortCode();
       const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+
+      // Get user id
+      const { data: { user } } = await supabase.auth.getUser();
 
       // Create the link
       const { data: link, error: linkError } = await supabase
@@ -145,8 +151,9 @@ const CreateLinkModal = ({ open, onOpenChange, planType }: CreateLinkModalProps)
           original_url: formattedUrl,
           short_code: shortCode,
           custom_domain: selectedDomain,
-          plan_type: planType,
+          plan_type: selectedPlan,
           status: "pending_payment",
+          user_id: user?.id || null,
         })
         .select()
         .single();
@@ -227,6 +234,9 @@ const CreateLinkModal = ({ open, onOpenChange, planType }: CreateLinkModalProps)
   const resetModal = () => {
     setStep("input");
     setOriginalUrl("");
+    setSelectedPlan("basic");
+    setSelectedDomain(DEFAULT_DOMAIN);
+    setCustomShortCode("");
     setSelectedCrypto("");
     setSelectedWallet(null);
     setLinkData(null);
@@ -247,7 +257,7 @@ const CreateLinkModal = ({ open, onOpenChange, planType }: CreateLinkModalProps)
       <DialogContent className="sm:max-w-md glass border-border">
         <DialogHeader>
           <DialogTitle className="font-heading text-xl">
-            {step === "input" && `Create ${planType === "pro" ? "Pro" : "Basic"} Link`}
+            {step === "input" && "Create New Link"}
             {step === "payment" && "Complete Payment"}
             {step === "success" && "Link Created!"}
           </DialogTitle>
@@ -266,9 +276,50 @@ const CreateLinkModal = ({ open, onOpenChange, planType }: CreateLinkModalProps)
               />
             </div>
 
-            {planType === "pro" && domains.length > 1 && (
-              <div className="space-y-2">
-                <Label htmlFor="domain">Select Domain</Label>
+            {/* Plan Selection */}
+            <div className="space-y-2">
+              <Label>Select Plan</Label>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => {
+                    setSelectedPlan("basic");
+                    setSelectedDomain(DEFAULT_DOMAIN);
+                    setCustomShortCode("");
+                  }}
+                  className={`p-4 rounded-lg border transition-all text-left ${
+                    selectedPlan === "basic"
+                      ? "border-primary bg-primary/10"
+                      : "border-border bg-secondary/50 hover:border-primary/50"
+                  }`}
+                >
+                  <div className="font-semibold text-foreground">Basic</div>
+                  <div className="text-2xl font-bold gradient-text">$5</div>
+                  <div className="text-xs text-muted-foreground mt-1">Default domain</div>
+                </button>
+                <button
+                  onClick={() => setSelectedPlan("pro")}
+                  className={`p-4 rounded-lg border transition-all text-left ${
+                    selectedPlan === "pro"
+                      ? "border-primary bg-primary/10"
+                      : "border-border bg-secondary/50 hover:border-primary/50"
+                  }`}
+                >
+                  <div className="font-semibold text-foreground">Pro</div>
+                  <div className="text-2xl font-bold gradient-text">$10</div>
+                  <div className="text-xs text-muted-foreground mt-1">Custom domain + short code</div>
+                </button>
+              </div>
+            </div>
+
+            {/* Domain Selection */}
+            <div className="space-y-2">
+              <Label htmlFor="domain">Domain</Label>
+              {selectedPlan === "basic" ? (
+                <div className="flex items-center gap-2 p-3 bg-secondary rounded-lg">
+                  <Globe className="w-4 h-4 text-primary" />
+                  <span className="text-foreground">{DEFAULT_DOMAIN}</span>
+                </div>
+              ) : (
                 <Select value={selectedDomain} onValueChange={setSelectedDomain}>
                   <SelectTrigger className="bg-input border-border">
                     <SelectValue placeholder="Select a domain" />
@@ -284,6 +335,24 @@ const CreateLinkModal = ({ open, onOpenChange, planType }: CreateLinkModalProps)
                     ))}
                   </SelectContent>
                 </Select>
+              )}
+            </div>
+
+            {/* Custom Short Code - Pro only */}
+            {selectedPlan === "pro" && (
+              <div className="space-y-2">
+                <Label htmlFor="shortcode">Custom Short Code (optional)</Label>
+                <Input
+                  id="shortcode"
+                  placeholder="Leave empty for auto-generated code"
+                  value={customShortCode}
+                  onChange={(e) => setCustomShortCode(e.target.value.replace(/[^a-zA-Z0-9-_]/g, ''))}
+                  className="bg-input border-border"
+                  maxLength={20}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Only letters, numbers, hyphens, and underscores allowed
+                </p>
               </div>
             )}
 
