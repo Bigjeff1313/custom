@@ -69,6 +69,8 @@ import {
   Smartphone,
   Tablet,
   MapPin,
+  CheckCircle,
+  XCircle,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -87,6 +89,11 @@ interface CustomDomain {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  user_id: string | null;
+}
+
+interface DomainWithUser extends CustomDomain {
+  user_email?: string;
 }
 
 interface UserWithRole {
@@ -105,7 +112,7 @@ const AdminDashboard = () => {
   const [links, setLinks] = useState<Link[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [wallets, setWallets] = useState<CryptoWallet[]>([]);
-  const [domains, setDomains] = useState<CustomDomain[]>([]);
+  const [domains, setDomains] = useState<DomainWithUser[]>([]);
   const [users, setUsers] = useState<UserWithRole[]>([]);
   const [allClicks, setAllClicks] = useState<LinkClick[]>([]);
   const [loading, setLoading] = useState(true);
@@ -195,8 +202,54 @@ const AdminDashboard = () => {
       .select("*")
       .order("created_at", { ascending: false });
 
-    if (data) setDomains(data as CustomDomain[]);
+    if (data) {
+      // Fetch user emails for domains that have user_id
+      const domainsWithUsers: DomainWithUser[] = await Promise.all(
+        data.map(async (domain) => {
+          if (domain.user_id) {
+            // Try to find user email from users list
+            const userMatch = users.find(u => u.id === domain.user_id);
+            return {
+              ...domain,
+              user_email: userMatch?.email || `User ${domain.user_id.slice(0, 8)}...`
+            } as DomainWithUser;
+          }
+          return { ...domain, user_email: 'Admin' } as DomainWithUser;
+        })
+      );
+      setDomains(domainsWithUsers);
+    }
     if (error) toast.error("Failed to load domains");
+  };
+
+  const handleVerifyDomain = async (id: string, verified: boolean) => {
+    const { error } = await supabase
+      .from("custom_domains")
+      .update({ is_verified: verified })
+      .eq("id", id);
+
+    if (error) {
+      toast.error("Failed to update domain verification");
+      return;
+    }
+
+    toast.success(verified ? "Domain verified!" : "Domain unverified");
+    fetchDomains();
+  };
+
+  const handleToggleDomainActive = async (id: string, active: boolean) => {
+    const { error } = await supabase
+      .from("custom_domains")
+      .update({ is_active: active })
+      .eq("id", id);
+
+    if (error) {
+      toast.error("Failed to update domain status");
+      return;
+    }
+
+    toast.success(active ? "Domain activated" : "Domain deactivated");
+    fetchDomains();
   };
 
   const fetchUsers = async (linksData: Link[]) => {
@@ -929,8 +982,8 @@ const AdminDashboard = () => {
                 <TableHeader>
                   <TableRow className="border-border">
                     <TableHead className="text-muted-foreground">Domain</TableHead>
-                    <TableHead className="text-muted-foreground">Verified</TableHead>
-                    <TableHead className="text-muted-foreground">Active</TableHead>
+                    <TableHead className="text-muted-foreground">Added By</TableHead>
+                    <TableHead className="text-muted-foreground">Status</TableHead>
                     <TableHead className="text-muted-foreground">Created</TableHead>
                     <TableHead className="text-muted-foreground text-right">Actions</TableHead>
                   </TableRow>
@@ -948,31 +1001,71 @@ const AdminDashboard = () => {
                         <TableCell className="font-medium text-foreground">
                           <div className="flex items-center gap-2">
                             <Globe className="w-4 h-4 text-primary" />
-                            {domain.domain}
+                            <span>{domain.domain}</span>
                           </div>
                         </TableCell>
-                        <TableCell>
-                          <span className={`px-2 py-1 rounded-full text-xs ${
-                            domain.is_verified ? "text-green-500 bg-green-500/10" : "text-amber-500 bg-amber-500/10"
-                          }`}>
-                            {domain.is_verified ? "Verified" : "Pending"}
-                          </span>
+                        <TableCell className="text-muted-foreground text-sm">
+                          {domain.user_email || 'Admin'}
                         </TableCell>
                         <TableCell>
-                          <span className={`px-2 py-1 rounded-full text-xs ${
-                            domain.is_active ? "text-green-500 bg-green-500/10" : "text-red-500 bg-red-500/10"
-                          }`}>
-                            {domain.is_active ? "Active" : "Inactive"}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className={`px-2 py-1 rounded-full text-xs ${
+                              domain.is_verified ? "text-green-500 bg-green-500/10" : "text-amber-500 bg-amber-500/10"
+                            }`}>
+                              {domain.is_verified ? "Verified" : "Pending"}
+                            </span>
+                            <span className={`px-2 py-1 rounded-full text-xs ${
+                              domain.is_active ? "text-green-500 bg-green-500/10" : "text-red-500 bg-red-500/10"
+                            }`}>
+                              {domain.is_active ? "Active" : "Inactive"}
+                            </span>
+                          </div>
                         </TableCell>
-                        <TableCell className="text-muted-foreground">
+                        <TableCell className="text-muted-foreground text-sm">
                           {formatDate(domain.created_at)}
                         </TableCell>
                         <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-2">
+                          <div className="flex items-center justify-end gap-1">
+                            {/* One-Click Verify Button */}
+                            {!domain.is_verified ? (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 text-green-500 hover:text-green-600 hover:bg-green-500/10"
+                                onClick={() => handleVerifyDomain(domain.id, true)}
+                              >
+                                <CheckCircle className="w-4 h-4 mr-1" />
+                                Verify
+                              </Button>
+                            ) : (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 text-amber-500 hover:text-amber-600 hover:bg-amber-500/10"
+                                onClick={() => handleVerifyDomain(domain.id, false)}
+                              >
+                                <XCircle className="w-4 h-4 mr-1" />
+                                Unverify
+                              </Button>
+                            )}
+                            {/* Toggle Active Button */}
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => handleToggleDomainActive(domain.id, !domain.is_active)}
+                              title={domain.is_active ? "Deactivate" : "Activate"}
+                            >
+                              {domain.is_active ? (
+                                <XCircle className="w-4 h-4 text-red-500" />
+                              ) : (
+                                <CheckCircle className="w-4 h-4 text-green-500" />
+                              )}
+                            </Button>
+                            {/* Edit Dialog */}
                             <Dialog>
                               <DialogTrigger asChild>
-                                <Button variant="ghost" size="icon" onClick={() => setEditingDomain(domain)}>
+                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditingDomain(domain)}>
                                   <Edit className="w-4 h-4" />
                                 </Button>
                               </DialogTrigger>
@@ -1013,9 +1106,10 @@ const AdminDashboard = () => {
                                 )}
                               </DialogContent>
                             </Dialog>
+                            {/* Delete Button */}
                             <AlertDialog>
                               <AlertDialogTrigger asChild>
-                                <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive">
                                   <Trash2 className="w-4 h-4" />
                                 </Button>
                               </AlertDialogTrigger>
