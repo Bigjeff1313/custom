@@ -10,13 +10,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Copy, Check, Loader2, Clock, Wallet, Globe, AlertCircle } from "lucide-react";
+import { Copy, Check, Loader2, Clock, Wallet, Globe, AlertCircle, Plus, Settings } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 interface CreateLinkModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  initialUrl?: string;
 }
 
 interface CryptoWallet {
@@ -33,10 +34,11 @@ interface CustomDomain {
 }
 
 const DEFAULT_DOMAIN = "customtextx.com";
+const SERVER_IP = "72.60.119.80";
 
-const CreateLinkModal = ({ open, onOpenChange }: CreateLinkModalProps) => {
-  const [step, setStep] = useState<"input" | "payment" | "success">("input");
-  const [originalUrl, setOriginalUrl] = useState("");
+const CreateLinkModal = ({ open, onOpenChange, initialUrl = "" }: CreateLinkModalProps) => {
+  const [step, setStep] = useState<"input" | "payment" | "success" | "domain-setup">("input");
+  const [originalUrl, setOriginalUrl] = useState(initialUrl);
   const [selectedPlan, setSelectedPlan] = useState<"basic" | "pro">("basic");
   const [selectedDomain, setSelectedDomain] = useState<string>(DEFAULT_DOMAIN);
   const [customShortCode, setCustomShortCode] = useState("");
@@ -48,6 +50,8 @@ const CreateLinkModal = ({ open, onOpenChange }: CreateLinkModalProps) => {
   const [linkData, setLinkData] = useState<{ shortCode: string; paymentId: string } | null>(null);
   const [selectedWallet, setSelectedWallet] = useState<CryptoWallet | null>(null);
   const [timeLeft, setTimeLeft] = useState(900); // 15 minutes
+  const [showDomainInstructions, setShowDomainInstructions] = useState(false);
+  const [newCustomDomain, setNewCustomDomain] = useState("");
 
   const price = selectedPlan === "basic" ? 5 : 10;
 
@@ -55,8 +59,11 @@ const CreateLinkModal = ({ open, onOpenChange }: CreateLinkModalProps) => {
     if (open) {
       fetchWallets();
       fetchDomains();
+      if (initialUrl) {
+        setOriginalUrl(initialUrl);
+      }
     }
-  }, [open]);
+  }, [open, initialUrl]);
 
   useEffect(() => {
     let timer: NodeJS.Timeout;
@@ -241,11 +248,18 @@ const CreateLinkModal = ({ open, onOpenChange }: CreateLinkModalProps) => {
     setSelectedWallet(null);
     setLinkData(null);
     setTimeLeft(900);
+    setShowDomainInstructions(false);
+    setNewCustomDomain("");
   };
 
   const handleClose = (open: boolean) => {
     if (!open) resetModal();
     onOpenChange(open);
+  };
+
+  const copyIpToClipboard = () => {
+    navigator.clipboard.writeText(SERVER_IP);
+    toast.success("IP address copied!");
   };
 
   const shortUrl = linkData
@@ -320,21 +334,68 @@ const CreateLinkModal = ({ open, onOpenChange }: CreateLinkModalProps) => {
                   <span className="text-foreground">{DEFAULT_DOMAIN}</span>
                 </div>
               ) : (
-                <Select value={selectedDomain} onValueChange={setSelectedDomain}>
-                  <SelectTrigger className="bg-input border-border">
-                    <SelectValue placeholder="Select a domain" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {domains.map((domain) => (
-                      <SelectItem key={domain.id} value={domain.domain}>
-                        <div className="flex items-center gap-2">
-                          <Globe className="w-4 h-4" />
-                          {domain.domain}
+                <div className="space-y-2">
+                  <Select value={selectedDomain} onValueChange={setSelectedDomain}>
+                    <SelectTrigger className="bg-input border-border">
+                      <SelectValue placeholder="Select a domain" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {domains.map((domain) => (
+                        <SelectItem key={domain.id} value={domain.domain}>
+                          <div className="flex items-center gap-2">
+                            <Globe className="w-4 h-4" />
+                            {domain.domain}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowDomainInstructions(!showDomainInstructions)}
+                    className="w-full flex items-center gap-2"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Add Custom Domain
+                  </Button>
+                  
+                  {showDomainInstructions && (
+                    <div className="p-4 bg-secondary/50 rounded-lg border border-border space-y-3">
+                      <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                        <Settings className="w-4 h-4 text-primary" />
+                        DNS Configuration Instructions
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        To connect your custom domain, add the following DNS records at your domain registrar:
+                      </p>
+                      <div className="space-y-2">
+                        <div className="p-2 bg-background rounded border border-border">
+                          <div className="text-xs text-muted-foreground mb-1">A Record (Root Domain)</div>
+                          <div className="flex items-center justify-between">
+                            <code className="text-sm text-foreground">@ → {SERVER_IP}</code>
+                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={copyIpToClipboard}>
+                              <Copy className="w-3 h-3" />
+                            </Button>
+                          </div>
                         </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                        <div className="p-2 bg-background rounded border border-border">
+                          <div className="text-xs text-muted-foreground mb-1">A Record (WWW Subdomain)</div>
+                          <div className="flex items-center justify-between">
+                            <code className="text-sm text-foreground">www → {SERVER_IP}</code>
+                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={copyIpToClipboard}>
+                              <Copy className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="p-2 bg-primary/10 rounded text-xs text-muted-foreground">
+                        <strong className="text-foreground">Note:</strong> After configuring DNS, contact support to verify and activate your domain. DNS propagation may take up to 48 hours.
+                      </div>
+                    </div>
+                  )}
+                </div>
               )}
             </div>
 

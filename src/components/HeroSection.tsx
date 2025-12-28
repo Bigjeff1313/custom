@@ -102,7 +102,11 @@ const HeroSection = () => {
 
       <CreateLinkModal 
         open={modalOpen} 
-        onOpenChange={setModalOpen}
+        onOpenChange={(open) => {
+          setModalOpen(open);
+          if (!open) setUrl("");
+        }}
+        initialUrl={url}
       />
     </section>
   );
