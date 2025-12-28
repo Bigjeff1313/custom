@@ -8,7 +8,6 @@ import CreateLinkModal from "./CreateLinkModal";
 const HeroSection = () => {
   const [url, setUrl] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
-  const [selectedPlan, setSelectedPlan] = useState<"basic" | "pro">("basic");
 
   const handleShorten = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,7 +24,6 @@ const HeroSection = () => {
       return;
     }
 
-    setSelectedPlan("basic");
     setModalOpen(true);
   };
 
@@ -105,7 +103,6 @@ const HeroSection = () => {
       <CreateLinkModal 
         open={modalOpen} 
         onOpenChange={setModalOpen}
-        planType={selectedPlan}
       />
     </section>
   );
