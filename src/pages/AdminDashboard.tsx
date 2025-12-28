@@ -94,8 +94,7 @@ interface UserWithRole {
   email: string;
   created_at: string;
   role: AppRole | null;
-  linkCount?: number;
-  totalClicks?: number;
+  links?: Link[];
 }
 
 interface LinkWithClicks extends Link {
@@ -154,11 +153,12 @@ const AdminDashboard = () => {
 
   const fetchData = async () => {
     setLoading(true);
-    await Promise.all([fetchLinks(), fetchPayments(), fetchWallets(), fetchDomains(), fetchUsers(), fetchAllClicks()]);
+    const [linksData] = await Promise.all([fetchLinks(), fetchPayments(), fetchWallets(), fetchDomains(), fetchAllClicks()]);
+    await fetchUsers(linksData || []);
     setLoading(false);
   };
 
-  const fetchLinks = async () => {
+  const fetchLinks = async (): Promise<Link[]> => {
     const { data, error } = await supabase
       .from("links")
       .select("*")
@@ -166,6 +166,7 @@ const AdminDashboard = () => {
 
     if (data) setLinks(data);
     if (error) toast.error("Failed to load links");
+    return data || [];
   };
 
   const fetchPayments = async () => {
@@ -198,10 +199,20 @@ const AdminDashboard = () => {
     if (error) toast.error("Failed to load domains");
   };
 
-  const fetchUsers = async () => {
+  const fetchUsers = async (linksData: Link[]) => {
     // Call edge function to get users list
     const { data, error } = await supabase.functions.invoke("mysql-api", {
       body: { action: "list-users" },
+    });
+
+    // Create a map of user_id to their links
+    const userLinksMap = new Map<string, Link[]>();
+    linksData.forEach((link) => {
+      if (link.user_id) {
+        const existing = userLinksMap.get(link.user_id) || [];
+        existing.push(link);
+        userLinksMap.set(link.user_id, existing);
+      }
     });
 
     if (error) {
@@ -217,12 +228,17 @@ const AdminDashboard = () => {
           email: `User ${r.user_id.slice(0, 8)}...`,
           created_at: r.created_at,
           role: r.role,
+          links: userLinksMap.get(r.user_id) || [],
         }));
         setUsers(usersWithRoles);
       }
       if (rolesError) toast.error("Failed to load users");
     } else if (data?.users) {
-      setUsers(data.users);
+      const usersWithLinks = data.users.map((user: UserWithRole) => ({
+        ...user,
+        links: userLinksMap.get(user.id) || [],
+      }));
+      setUsers(usersWithLinks);
     }
   };
 
@@ -474,7 +490,7 @@ const AdminDashboard = () => {
       toast.success(data?.message || "User created successfully");
       setNewUser({ email: "", password: "", role: "user" });
       setUserDialogOpen(false);
-      fetchUsers();
+      fetchUsers(links);
     } catch (error: any) {
       toast.error(error.message || "Failed to create user");
     }
@@ -510,7 +526,7 @@ const AdminDashboard = () => {
     }
 
     toast.success("Role updated");
-    fetchUsers();
+    fetchUsers(links);
   };
 
   const handleDeleteUserRole = async (userId: string) => {
@@ -522,7 +538,7 @@ const AdminDashboard = () => {
     }
 
     toast.success("User role removed");
-    fetchUsers();
+    fetchUsers(links);
   };
 
   const handleUpdateLinkStatus = async (id: string, status: Link["status"]) => {
@@ -1362,6 +1378,8 @@ const AdminDashboard = () => {
                     <TableHead className="text-muted-foreground">User ID</TableHead>
                     <TableHead className="text-muted-foreground">Email</TableHead>
                     <TableHead className="text-muted-foreground">Role</TableHead>
+                    <TableHead className="text-muted-foreground">Links</TableHead>
+                    <TableHead className="text-muted-foreground">Total Clicks</TableHead>
                     <TableHead className="text-muted-foreground">Created</TableHead>
                     <TableHead className="text-muted-foreground text-right">Actions</TableHead>
                   </TableRow>
@@ -1369,73 +1387,106 @@ const AdminDashboard = () => {
                 <TableBody>
                   {users.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                         No users with roles found
                       </TableCell>
                     </TableRow>
                   ) : (
-                    users.map((user) => (
-                      <TableRow key={user.id} className="border-border">
-                        <TableCell>
-                          <code className="text-xs text-muted-foreground">
-                            {user.id.slice(0, 8)}...
-                          </code>
-                        </TableCell>
-                        <TableCell className="font-medium text-foreground">
-                          {user.email}
-                        </TableCell>
-                        <TableCell>
-                          <span className={`px-2 py-1 rounded-full text-xs flex items-center gap-1 w-fit ${
-                            user.role === "admin" 
-                              ? "text-amber-500 bg-amber-500/10" 
-                              : "text-blue-500 bg-blue-500/10"
-                          }`}>
-                            {user.role === "admin" && <Shield className="w-3 h-3" />}
-                            {user.role || "No role"}
-                          </span>
-                        </TableCell>
-                        <TableCell className="text-muted-foreground text-sm">
-                          {formatDate(user.created_at)}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            <Select
-                              value={user.role || "user"}
-                              onValueChange={(value) => handleUpdateUserRole(user.id, value as AppRole)}
-                            >
-                              <SelectTrigger className="w-24 h-8 text-xs bg-input border-border">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="user">User</SelectItem>
-                                <SelectItem value="admin">Admin</SelectItem>
-                              </SelectContent>
-                            </Select>
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive">
-                                  <Trash2 className="w-4 h-4" />
-                                </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent className="glass border-border">
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Remove User Role</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    This will remove the user's role. They will no longer have access.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction onClick={() => handleDeleteUserRole(user.id)} className="bg-destructive text-destructive-foreground">
-                                    Remove
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))
+                    users.map((user) => {
+                      const userLinks = user.links || [];
+                      const totalClicks = userLinks.reduce((sum, link) => sum + (link.click_count || 0), 0);
+                      
+                      return (
+                        <TableRow key={user.id} className="border-border align-top">
+                          <TableCell>
+                            <code className="text-xs text-muted-foreground">
+                              {user.id.slice(0, 8)}...
+                            </code>
+                          </TableCell>
+                          <TableCell className="font-medium text-foreground">
+                            {user.email}
+                          </TableCell>
+                          <TableCell>
+                            <span className={`px-2 py-1 rounded-full text-xs flex items-center gap-1 w-fit ${
+                              user.role === "admin" 
+                                ? "text-amber-500 bg-amber-500/10" 
+                                : "text-blue-500 bg-blue-500/10"
+                            }`}>
+                              {user.role === "admin" && <Shield className="w-3 h-3" />}
+                              {user.role || "No role"}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            {userLinks.length === 0 ? (
+                              <span className="text-muted-foreground text-sm">No links</span>
+                            ) : (
+                              <div className="space-y-1 max-h-32 overflow-y-auto">
+                                {userLinks.map((link) => (
+                                  <div key={link.id} className="flex items-center gap-2">
+                                    <code className="text-xs text-primary">
+                                      {link.custom_domain}/{link.short_code}
+                                    </code>
+                                    <span className={`px-1.5 py-0.5 rounded text-[10px] ${getStatusColor(link.status)}`}>
+                                      {link.status.replace("_", " ")}
+                                    </span>
+                                    <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                      <MousePointerClick className="w-3 h-3" />
+                                      {link.click_count || 0}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-foreground font-medium">
+                            <div className="flex items-center gap-1">
+                              <MousePointerClick className="w-4 h-4 text-blue-500" />
+                              {totalClicks}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground text-sm">
+                            {formatDate(user.created_at)}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              <Select
+                                value={user.role || "user"}
+                                onValueChange={(value) => handleUpdateUserRole(user.id, value as AppRole)}
+                              >
+                                <SelectTrigger className="w-24 h-8 text-xs bg-input border-border">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="user">User</SelectItem>
+                                  <SelectItem value="admin">Admin</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive">
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent className="glass border-border">
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Remove User Role</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      This will remove the user's role. They will no longer have access.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction onClick={() => handleDeleteUserRole(user.id)} className="bg-destructive text-destructive-foreground">
+                                      Remove
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
                   )}
                 </TableBody>
               </Table>

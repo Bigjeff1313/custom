@@ -10,7 +10,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Copy, Check, Loader2, Clock, Wallet, Globe, AlertCircle, Plus, Settings } from "lucide-react";
+import { Copy, Check, Loader2, Clock, Wallet, Globe, AlertCircle, Plus, Settings, QrCode, Download } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -556,6 +557,54 @@ const CreateLinkModal = ({ open, onOpenChange, initialUrl = "" }: CreateLinkModa
                 </Button>
               </div>
             </div>
+
+            {/* QR Code for Pro users */}
+            {selectedPlan === "pro" && (
+              <div className="space-y-3 pt-4 border-t border-border">
+                <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                  <QrCode className="w-4 h-4" />
+                  <span>QR Code (Pro Feature)</span>
+                </div>
+                <div className="flex justify-center">
+                  <div className="p-4 bg-white rounded-xl">
+                    <QRCodeSVG 
+                      value={`https://${shortUrl}`}
+                      size={150}
+                      level="H"
+                      id="qr-code"
+                    />
+                  </div>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mx-auto flex items-center gap-2"
+                  onClick={() => {
+                    const svg = document.getElementById("qr-code");
+                    if (svg) {
+                      const svgData = new XMLSerializer().serializeToString(svg);
+                      const canvas = document.createElement("canvas");
+                      const ctx = canvas.getContext("2d");
+                      const img = new Image();
+                      img.onload = () => {
+                        canvas.width = img.width;
+                        canvas.height = img.height;
+                        ctx?.drawImage(img, 0, 0);
+                        const pngFile = canvas.toDataURL("image/png");
+                        const downloadLink = document.createElement("a");
+                        downloadLink.download = `qr-${linkData?.shortCode}.png`;
+                        downloadLink.href = pngFile;
+                        downloadLink.click();
+                      };
+                      img.src = "data:image/svg+xml;base64," + btoa(svgData);
+                    }
+                  }}
+                >
+                  <Download className="w-4 h-4" />
+                  Download QR Code
+                </Button>
+              </div>
+            )}
 
             <Button onClick={() => handleClose(false)} className="w-full" variant="pricing">
               Done
