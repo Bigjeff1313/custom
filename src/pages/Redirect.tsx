@@ -61,12 +61,11 @@ const Redirect = () => {
     setState("verifying");
 
     try {
-      // Call the redirect function to increment click and get URL with device info
+      // Call the redirect function to increment click and get URL
       const { data, error: fnError } = await supabase.functions.invoke('redirect', {
         body: { 
           shortCode,
-          domain: window.location.hostname,
-          userAgent: navigator.userAgent,
+          domain: window.location.hostname 
         }
       });
 
@@ -173,21 +172,6 @@ const Redirect = () => {
           </p>
         </div>
 
-        {/* Link Preview */}
-        <div className="bg-muted/50 rounded-xl p-4 mb-6">
-          <div className="flex items-center gap-2 mb-2">
-            <Link2 className="w-4 h-4 text-primary" />
-            <span className="text-sm font-medium text-foreground">Destination</span>
-          </div>
-          <p className="text-sm text-muted-foreground truncate">
-            {originalUrl}
-          </p>
-          <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
-            <MousePointerClick className="w-3 h-3" />
-            <span>{clickCount} clicks</span>
-          </div>
-        </div>
-
         {/* Verification Checkbox */}
         <div className="border-2 border-border rounded-xl p-4 mb-6 hover:border-primary/50 transition-colors">
           <div className="flex items-center gap-4">
@@ -225,14 +209,14 @@ const Redirect = () => {
             </>
           ) : (
             <>
-              Continue to Website
+              Continue
             </>
           )}
         </Button>
 
         {/* Footer */}
         <p className="text-center text-xs text-muted-foreground mt-4">
-          Protected by CustomTextX security
+          Protected by Cloudflare Security
         </p>
       </div>
     </div>
