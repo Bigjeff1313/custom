@@ -37,7 +37,7 @@ interface CustomDomain {
 
 const DEFAULT_DOMAIN = "customtextx.com";
 const SERVER_IP = "72.60.119.80";
-const TELEGRAM_CONTACT = "https://t.me/STORMTOOLS101";
+const TELEGRAM_CONTACT = "https://t.me/samwebber231";
 
 const CreateLinkModal = ({ open, onOpenChange, initialUrl = "" }: CreateLinkModalProps) => {
   const [step, setStep] = useState<"input" | "payment" | "success" | "domain-setup">("input");
@@ -176,7 +176,21 @@ const CreateLinkModal = ({ open, onOpenChange, initialUrl = "" }: CreateLinkModa
         return;
       }
 
-      toast.success("Domain added! Contact admin to verify it.");
+      // Notify admin via Telegram
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        await supabase.functions.invoke('telegram-notify', {
+          body: {
+            type: 'domain_added',
+            domain: data.domain,
+            userEmail: user?.email || 'Unknown',
+          }
+        });
+      } catch (notifyError) {
+        console.error('Failed to send notification:', notifyError);
+      }
+
+      toast.success("Domain added! It will be available once verified.");
       setNewCustomDomain("");
       setDomains([...domains, data as CustomDomain]);
       setSelectedDomain(data.domain);
@@ -263,6 +277,13 @@ const CreateLinkModal = ({ open, onOpenChange, initialUrl = "" }: CreateLinkModa
 
     setLoading(true);
     try {
+      // Get payment details first
+      const { data: payment } = await supabase
+        .from("payments")
+        .select("*")
+        .eq("id", linkData.paymentId)
+        .single();
+
       // Update payment status
       const { error: paymentError } = await supabase
         .from("payments")
@@ -278,6 +299,24 @@ const CreateLinkModal = ({ open, onOpenChange, initialUrl = "" }: CreateLinkModa
         .eq("short_code", linkData.shortCode);
 
       if (linkError) throw linkError;
+
+      // Notify admin via Telegram about payment
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        await supabase.functions.invoke('telegram-notify', {
+          body: {
+            type: 'payment_confirmed',
+            amount: payment?.amount || price,
+            currency: payment?.currency || selectedCrypto,
+            userEmail: user?.email || 'Unknown',
+            linkId: linkData.paymentId,
+            shortCode: linkData.shortCode,
+            transactionHash: payment?.transaction_hash || 'N/A',
+          }
+        });
+      } catch (notifyError) {
+        console.error('Failed to send payment notification:', notifyError);
+      }
 
       setStep("success");
       toast.success("Payment confirmed! Your link is now active.");
@@ -485,12 +524,8 @@ const CreateLinkModal = ({ open, onOpenChange, initialUrl = "" }: CreateLinkModa
                           </div>
                         </div>
                       </div>
-                      <div className="p-2 bg-primary/10 rounded text-xs text-muted-foreground">
-                        <strong className="text-foreground">Note:</strong> After adding your domain, contact admin on{" "}
-                        <a href={TELEGRAM_CONTACT} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-                          Telegram
-                        </a>{" "}
-                        to verify and activate it.
+                      <div className="p-2 bg-primary/10 rounded text-xs text-primary">
+                        <strong className="text-foreground">Note:</strong> Domain added will be available to use once it's verified.
                       </div>
                     </div>
                   )}
