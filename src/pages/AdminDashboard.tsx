@@ -652,6 +652,36 @@ const AdminDashboard = () => {
     fetchPayments();
   };
 
+  const handleConfirmPayment = async (paymentId: string, linkId: string | null) => {
+    // Update payment status to confirmed
+    const { error: paymentError } = await supabase
+      .from("payments")
+      .update({ status: "confirmed" })
+      .eq("id", paymentId);
+
+    if (paymentError) {
+      toast.error("Failed to confirm payment");
+      return;
+    }
+
+    // Activate the associated link
+    if (linkId) {
+      const { error: linkError } = await supabase
+        .from("links")
+        .update({ status: "active" })
+        .eq("id", linkId);
+
+      if (linkError) {
+        toast.error("Payment confirmed but failed to activate link");
+        return;
+      }
+    }
+
+    toast.success("Payment confirmed and link activated!");
+    fetchPayments();
+    fetchLinks();
+  };
+
   const copyToClipboard = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
     setCopied(id);
@@ -1360,6 +1390,17 @@ const AdminDashboard = () => {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-2">
+                            {payment.status === 'pending' && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 text-green-500 hover:text-green-600 hover:bg-green-500/10"
+                                onClick={() => handleConfirmPayment(payment.id, payment.link_id)}
+                              >
+                                <CheckCircle className="w-4 h-4 mr-1" />
+                                Confirm
+                              </Button>
+                            )}
                             <Select
                               value={payment.status}
                               onValueChange={(value) => handleUpdatePaymentStatus(payment.id, value as Payment["status"])}

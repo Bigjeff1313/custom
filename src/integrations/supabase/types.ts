@@ -68,6 +68,42 @@ export type Database = {
         }
         Relationships: []
       }
+      fund_transactions: {
+        Row: {
+          amount: number
+          created_at: string
+          currency: string
+          id: string
+          status: string
+          transaction_hash: string | null
+          updated_at: string
+          user_id: string
+          wallet_address: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          currency: string
+          id?: string
+          status?: string
+          transaction_hash?: string | null
+          updated_at?: string
+          user_id: string
+          wallet_address: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          currency?: string
+          id?: string
+          status?: string
+          transaction_hash?: string | null
+          updated_at?: string
+          user_id?: string
+          wallet_address?: string
+        }
+        Relationships: []
+      }
       link_clicks: {
         Row: {
           browser: string | null
@@ -203,6 +239,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      user_funds: {
+        Row: {
+          balance: number
+          created_at: string
+          id: string
+          total_deposited: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          balance?: number
+          created_at?: string
+          id?: string
+          total_deposited?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          balance?: number
+          created_at?: string
+          id?: string
+          total_deposited?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       user_roles: {
         Row: {

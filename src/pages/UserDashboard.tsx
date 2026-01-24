@@ -34,6 +34,8 @@ import {
   Eye,
   Edit,
   Send,
+  Wallet,
+  DollarSign,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -41,6 +43,7 @@ import type { Tables } from "@/integrations/supabase/types";
 import { User as SupabaseUser } from "@supabase/supabase-js";
 import CreateLinkModal from "@/components/CreateLinkModal";
 import EditLinkModal from "@/components/EditLinkModal";
+import AddFundsModal from "@/components/AddFundsModal";
 
 const TELEGRAM_CONTACT = "https://t.me/STORMTOOLS101";
 
@@ -61,6 +64,8 @@ const UserDashboard = () => {
   const [clicksDialogOpen, setClicksDialogOpen] = useState(false);
   const [editLink, setEditLink] = useState<Link | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [addFundsOpen, setAddFundsOpen] = useState(false);
+  const [userBalance, setUserBalance] = useState(0);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -94,8 +99,20 @@ const UserDashboard = () => {
 
   const fetchData = async (userId: string) => {
     setLoading(true);
-    await fetchLinks(userId);
+    await Promise.all([fetchLinks(userId), fetchUserBalance(userId)]);
     setLoading(false);
+  };
+
+  const fetchUserBalance = async (userId: string) => {
+    const { data } = await supabase
+      .from("user_funds")
+      .select("balance")
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (data) {
+      setUserBalance(Number(data.balance));
+    }
   };
 
   const fetchLinks = async (userId: string) => {
@@ -232,7 +249,27 @@ const UserDashboard = () => {
 
       <div className="container mx-auto px-4 py-6">
         {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+          <div className="glass rounded-xl p-5">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 bg-emerald-500/20 rounded-lg flex items-center justify-center">
+                <Wallet className="w-6 h-6 text-emerald-500" />
+              </div>
+              <div>
+                <p className="text-muted-foreground text-sm">Balance</p>
+                <p className="text-2xl font-bold text-foreground">${userBalance.toFixed(2)}</p>
+              </div>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full mt-3"
+              onClick={() => setAddFundsOpen(true)}
+            >
+              <DollarSign className="w-4 h-4 mr-1" />
+              Add Funds
+            </Button>
+          </div>
           <div className="glass rounded-xl p-5">
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 bg-primary/20 rounded-lg flex items-center justify-center">
@@ -267,6 +304,13 @@ const UserDashboard = () => {
             </div>
           </div>
         </div>
+
+        {/* Add Funds Modal */}
+        <AddFundsModal
+          open={addFundsOpen}
+          onOpenChange={setAddFundsOpen}
+          onSuccess={() => user && fetchUserBalance(user.id)}
+        />
 
         {/* Links Section */}
         <div className="space-y-4">
