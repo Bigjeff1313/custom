@@ -284,32 +284,20 @@ const CreateLinkModal = ({ open, onOpenChange, initialUrl = "" }: CreateLinkModa
         .eq("id", linkData.paymentId)
         .single();
 
-      // Update payment status
-      const { error: paymentError } = await supabase
-        .from("payments")
-        .update({ status: "confirmed" })
-        .eq("id", linkData.paymentId);
+      // NOTE: Payment stays pending, link stays pending_payment
+      // Admin must confirm the payment to activate the link
 
-      if (paymentError) throw paymentError;
-
-      // Activate the link
-      const { error: linkError } = await supabase
-        .from("links")
-        .update({ status: "active" })
-        .eq("short_code", linkData.shortCode);
-
-      if (linkError) throw linkError;
-
-      // Notify admin via Telegram about payment
+      // Notify admin via Telegram about payment submission with confirm button
       try {
         const { data: { user } } = await supabase.auth.getUser();
         await supabase.functions.invoke('telegram-notify', {
           body: {
-            type: 'payment_confirmed',
+            type: 'payment_submitted',
             amount: payment?.amount || price,
             currency: payment?.currency || selectedCrypto,
             userEmail: user?.email || 'Unknown',
             linkId: linkData.paymentId,
+            paymentId: linkData.paymentId,
             shortCode: linkData.shortCode,
             transactionHash: payment?.transaction_hash || 'N/A',
           }
@@ -319,9 +307,9 @@ const CreateLinkModal = ({ open, onOpenChange, initialUrl = "" }: CreateLinkModa
       }
 
       setStep("success");
-      toast.success("Payment confirmed! Your link is now active.");
+      toast.success("Payment submitted! Awaiting admin confirmation.");
     } catch (error: any) {
-      toast.error(error.message || "Failed to confirm payment");
+      toast.error(error.message || "Failed to submit payment");
       console.error(error);
     } finally {
       setLoading(false);
@@ -691,13 +679,16 @@ const CreateLinkModal = ({ open, onOpenChange, initialUrl = "" }: CreateLinkModa
 
         {step === "success" && (
           <div className="space-y-4 text-center">
-            <div className="w-16 h-16 mx-auto bg-primary/20 rounded-full flex items-center justify-center">
-              <Check className="w-8 h-8 text-primary" />
+            <div className="w-16 h-16 mx-auto bg-amber-500/20 rounded-full flex items-center justify-center">
+              <Clock className="w-8 h-8 text-amber-500" />
             </div>
 
-            <p className="text-muted-foreground">
-              Your payment is being verified. Your link will be active shortly.
-            </p>
+            <div>
+              <h3 className="font-semibold text-foreground">Payment Submitted!</h3>
+              <p className="text-sm text-muted-foreground mt-2">
+                Your payment is awaiting admin confirmation. Your link will be activated once the payment is verified.
+              </p>
+            </div>
 
             <div className="space-y-2">
               <Label>Your shortened link</Label>
