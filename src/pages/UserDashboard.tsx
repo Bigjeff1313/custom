@@ -15,6 +15,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Link2,
   LogOut,
@@ -33,9 +34,9 @@ import {
   MapPin,
   Eye,
   Edit,
-  Send,
   Wallet,
   DollarSign,
+  History,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -44,6 +45,7 @@ import { User as SupabaseUser } from "@supabase/supabase-js";
 import CreateLinkModal from "@/components/CreateLinkModal";
 import EditLinkModal from "@/components/EditLinkModal";
 import AddFundsModal from "@/components/AddFundsModal";
+import TransactionHistory from "@/components/TransactionHistory";
 
 const TELEGRAM_CONTACT = "https://t.me/STORMTOOLS101";
 
@@ -312,130 +314,150 @@ const UserDashboard = () => {
           onSuccess={() => user && fetchUserBalance(user.id)}
         />
 
-        {/* Links Section */}
-        <div className="space-y-4">
-          <div className="flex justify-between items-center">
-            <h2 className="font-heading text-lg font-semibold text-foreground">My Links</h2>
-            <Button variant="pricing" onClick={() => setCreateDialogOpen(true)}>
-              <Plus className="w-4 h-4 mr-2" />
-              Create Link
-            </Button>
-          </div>
+        {/* Tabs Section */}
+        <Tabs defaultValue="links" className="space-y-4">
+          <TabsList className="bg-muted/50">
+            <TabsTrigger value="links" className="gap-2">
+              <Link2 className="w-4 h-4" />
+              My Links
+            </TabsTrigger>
+            <TabsTrigger value="transactions" className="gap-2">
+              <History className="w-4 h-4" />
+              Transactions
+            </TabsTrigger>
+          </TabsList>
 
-          <CreateLinkModal
-            open={createDialogOpen}
-            onOpenChange={(open) => {
-              setCreateDialogOpen(open);
-              if (!open && user) fetchLinks(user.id);
-            }}
-          />
+          <TabsContent value="links" className="space-y-4">
+            <div className="flex justify-between items-center">
+              <h2 className="font-heading text-lg font-semibold text-foreground">My Links</h2>
+              <Button variant="pricing" onClick={() => setCreateDialogOpen(true)}>
+                <Plus className="w-4 h-4 mr-2" />
+                Create Link
+              </Button>
+            </div>
 
-          <EditLinkModal
-            open={editDialogOpen}
-            onOpenChange={setEditDialogOpen}
-            link={editLink}
-            onSuccess={() => user && fetchLinks(user.id)}
-          />
+            <CreateLinkModal
+              open={createDialogOpen}
+              onOpenChange={(open) => {
+                setCreateDialogOpen(open);
+                if (!open && user) fetchLinks(user.id);
+              }}
+            />
 
-          <div className="glass rounded-xl overflow-hidden">
-            <Table>
-              <TableHeader>
-                <TableRow className="border-border">
-                  <TableHead className="text-muted-foreground">Short URL</TableHead>
-                  <TableHead className="text-muted-foreground">Original URL</TableHead>
-                  <TableHead className="text-muted-foreground">Status</TableHead>
-                  <TableHead className="text-muted-foreground">Clicks</TableHead>
-                  <TableHead className="text-muted-foreground">Created</TableHead>
-                  <TableHead className="text-muted-foreground">Analytics</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {links.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                      No links yet. Create your first link!
-                    </TableCell>
+            <EditLinkModal
+              open={editDialogOpen}
+              onOpenChange={setEditDialogOpen}
+              link={editLink}
+              onSuccess={() => user && fetchLinks(user.id)}
+            />
+
+            <div className="glass rounded-xl overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-border">
+                    <TableHead className="text-muted-foreground">Short URL</TableHead>
+                    <TableHead className="text-muted-foreground">Original URL</TableHead>
+                    <TableHead className="text-muted-foreground">Status</TableHead>
+                    <TableHead className="text-muted-foreground">Clicks</TableHead>
+                    <TableHead className="text-muted-foreground">Created</TableHead>
+                    <TableHead className="text-muted-foreground">Analytics</TableHead>
                   </TableRow>
-                ) : (
-                  links.map((link) => (
-                    <TableRow key={link.id} className="border-border">
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <code className="text-sm text-primary font-mono">
-                            {link.custom_domain}/{link.short_code}
-                          </code>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6"
-                            onClick={() =>
-                              copyToClipboard(
-                                `https://${link.custom_domain}/${link.short_code}`,
-                                link.id
-                              )
-                            }
-                          >
-                            {copied === link.id ? (
-                              <Check className="w-3 h-3 text-green-500" />
-                            ) : (
-                              <Copy className="w-3 h-3" />
-                            )}
-                          </Button>
-                        </div>
-                      </TableCell>
-                      <TableCell className="max-w-[200px]">
-                        <div className="flex items-center gap-2">
-                          <span className="truncate text-muted-foreground text-sm">
-                            {link.original_url}
-                          </span>
-                          <a href={link.original_url} target="_blank" rel="noopener noreferrer">
-                            <ExternalLink className="w-3 h-3 text-muted-foreground hover:text-foreground" />
-                          </a>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <span className={`px-2 py-1 rounded-full text-xs ${getStatusColor(link.status)}`}>
-                          {link.status.replace("_", " ")}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-foreground font-medium">
-                        {link.click_count}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground text-sm">
-                        {formatDate(link.created_at)}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              setEditLink(link);
-                              setEditDialogOpen(true);
-                            }}
-                            className="gap-1"
-                          >
-                            <Edit className="w-4 h-4" />
-                            Edit
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleViewClicks(link)}
-                            className="gap-1"
-                          >
-                            <Eye className="w-4 h-4" />
-                            View
-                          </Button>
-                        </div>
+                </TableHeader>
+                <TableBody>
+                  {links.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                        No links yet. Create your first link!
                       </TableCell>
                     </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </div>
+                  ) : (
+                    links.map((link) => (
+                      <TableRow key={link.id} className="border-border">
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <code className="text-sm text-primary font-mono">
+                              {link.custom_domain}/{link.short_code}
+                            </code>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6"
+                              onClick={() =>
+                                copyToClipboard(
+                                  `https://${link.custom_domain}/${link.short_code}`,
+                                  link.id
+                                )
+                              }
+                            >
+                              {copied === link.id ? (
+                                <Check className="w-3 h-3 text-green-500" />
+                              ) : (
+                                <Copy className="w-3 h-3" />
+                              )}
+                            </Button>
+                          </div>
+                        </TableCell>
+                        <TableCell className="max-w-[200px]">
+                          <div className="flex items-center gap-2">
+                            <span className="truncate text-muted-foreground text-sm">
+                              {link.original_url}
+                            </span>
+                            <a href={link.original_url} target="_blank" rel="noopener noreferrer">
+                              <ExternalLink className="w-3 h-3 text-muted-foreground hover:text-foreground" />
+                            </a>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <span className={`px-2 py-1 rounded-full text-xs ${getStatusColor(link.status)}`}>
+                            {link.status.replace("_", " ")}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-foreground font-medium">
+                          {link.click_count}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground text-sm">
+                          {formatDate(link.created_at)}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setEditLink(link);
+                                setEditDialogOpen(true);
+                              }}
+                              className="gap-1"
+                            >
+                              <Edit className="w-4 h-4" />
+                              Edit
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleViewClicks(link)}
+                              className="gap-1"
+                            >
+                              <Eye className="w-4 h-4" />
+                              View
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="transactions">
+            <div className="space-y-4">
+              <h2 className="font-heading text-lg font-semibold text-foreground">Transaction History</h2>
+              {user && <TransactionHistory userId={user.id} />}
+            </div>
+          </TabsContent>
+        </Tabs>
       </div>
 
       {/* Click Analytics Dialog */}
