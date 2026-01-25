@@ -73,6 +73,18 @@ serve(async (req) => {
         `👤 User: ${payload.userEmail || 'Unknown'}\n` +
         `📝 Transaction ID: \`${payload.transactionId || 'N/A'}\`\n\n` +
         `⚠️ *Please verify payment and confirm in admin dashboard*`;
+      
+      // Add inline keyboard for fund deposits
+      if (payload.transactionId) {
+        inlineKeyboard = {
+          inline_keyboard: [[
+            {
+              text: '✅ Confirm Deposit',
+              callback_data: `confirm_deposit_${payload.transactionId}`
+            }
+          ]]
+        };
+      }
     } else {
       return new Response(
         JSON.stringify({ error: 'Invalid notification type' }),
