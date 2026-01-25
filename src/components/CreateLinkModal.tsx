@@ -10,7 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Copy, Check, Loader2, Clock, Wallet, Globe, AlertCircle, Plus, Settings, QrCode, Download, Send } from "lucide-react";
+import { Copy, Check, Loader2, Clock, Wallet, Globe, AlertCircle, Plus, Settings, QrCode, Download, Send, CreditCard } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -56,6 +56,8 @@ const CreateLinkModal = ({ open, onOpenChange, initialUrl = "" }: CreateLinkModa
   const [showDomainInstructions, setShowDomainInstructions] = useState(false);
   const [newCustomDomain, setNewCustomDomain] = useState("");
   const [addingDomain, setAddingDomain] = useState(false);
+  const [userBalance, setUserBalance] = useState<number>(0);
+  const [useBalance, setUseBalance] = useState(false);
 
   const price = selectedPlan === "basic" ? 5 : 10;
 
@@ -63,11 +65,28 @@ const CreateLinkModal = ({ open, onOpenChange, initialUrl = "" }: CreateLinkModa
     if (open) {
       fetchWallets();
       fetchDomains();
+      fetchUserBalance();
       if (initialUrl) {
         setOriginalUrl(initialUrl);
       }
     }
   }, [open, initialUrl]);
+
+  const fetchUserBalance = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      setUserBalance(0);
+      return;
+    }
+    
+    const { data } = await supabase
+      .from("user_funds")
+      .select("balance")
+      .eq("user_id", user.id)
+      .single();
+    
+    setUserBalance(data?.balance || 0);
+  };
 
   useEffect(() => {
     let timer: NodeJS.Timeout;
@@ -210,8 +229,15 @@ const CreateLinkModal = ({ open, onOpenChange, initialUrl = "" }: CreateLinkModa
       return;
     }
 
-    if (!selectedCrypto || !selectedWallet) {
+    // If not using balance, must have selected a crypto wallet
+    if (!useBalance && (!selectedCrypto || !selectedWallet)) {
       toast.error("Please select a payment method");
+      return;
+    }
+
+    // If using balance, check sufficient funds
+    if (useBalance && userBalance < price) {
+      toast.error("Insufficient balance");
       return;
     }
 
@@ -229,41 +255,86 @@ const CreateLinkModal = ({ open, onOpenChange, initialUrl = "" }: CreateLinkModa
       // Get user id
       const { data: { user } } = await supabase.auth.getUser();
 
-      // Create the link
-      const { data: link, error: linkError } = await supabase
-        .from("links")
-        .insert({
-          original_url: formattedUrl,
-          short_code: shortCode,
-          custom_domain: selectedDomain,
-          plan_type: selectedPlan,
-          status: "pending_payment",
-          user_id: user?.id || null,
-        })
-        .select()
-        .single();
+      if (useBalance && user) {
+        // Pay with balance - create link as active immediately
+        const { data: link, error: linkError } = await supabase
+          .from("links")
+          .insert({
+            original_url: formattedUrl,
+            short_code: shortCode,
+            custom_domain: selectedDomain,
+            plan_type: selectedPlan,
+            status: "active",
+            user_id: user.id,
+          })
+          .select()
+          .single();
 
-      if (linkError) throw linkError;
+        if (linkError) throw linkError;
 
-      // Create payment record
-      const { data: payment, error: paymentError } = await supabase
-        .from("payments")
-        .insert({
-          link_id: link.id,
-          amount: price,
-          currency: selectedCrypto,
-          wallet_address: selectedWallet.wallet_address,
-          status: "pending",
-          expires_at: expiresAt,
-        })
-        .select()
-        .single();
+        // Deduct balance from user_funds
+        const newBalance = userBalance - price;
+        const { error: balanceError } = await supabase
+          .from("user_funds")
+          .update({ balance: newBalance, updated_at: new Date().toISOString() })
+          .eq("user_id", user.id);
 
-      if (paymentError) throw paymentError;
+        if (balanceError) throw balanceError;
 
-      setLinkData({ shortCode, paymentId: payment.id });
-      setStep("payment");
-      setTimeLeft(900);
+        // Create a payment record for tracking (marked as confirmed)
+        await supabase
+          .from("payments")
+          .insert({
+            link_id: link.id,
+            amount: price,
+            currency: "BALANCE",
+            wallet_address: "user_balance",
+            status: "confirmed",
+            expires_at: expiresAt,
+            transaction_hash: `balance_${Date.now()}`,
+          });
+
+        setLinkData({ shortCode, paymentId: link.id });
+        setUserBalance(newBalance);
+        setStep("success");
+        toast.success("Link created successfully using your balance!");
+      } else {
+        // Create the link with pending payment status
+        const { data: link, error: linkError } = await supabase
+          .from("links")
+          .insert({
+            original_url: formattedUrl,
+            short_code: shortCode,
+            custom_domain: selectedDomain,
+            plan_type: selectedPlan,
+            status: "pending_payment",
+            user_id: user?.id || null,
+          })
+          .select()
+          .single();
+
+        if (linkError) throw linkError;
+
+        // Create payment record
+        const { data: payment, error: paymentError } = await supabase
+          .from("payments")
+          .insert({
+            link_id: link.id,
+            amount: price,
+            currency: selectedCrypto,
+            wallet_address: selectedWallet!.wallet_address,
+            status: "pending",
+            expires_at: expiresAt,
+          })
+          .select()
+          .single();
+
+        if (paymentError) throw paymentError;
+
+        setLinkData({ shortCode, paymentId: payment.id });
+        setStep("payment");
+        setTimeLeft(900);
+      }
     } catch (error: any) {
       toast.error(error.message || "Failed to create link");
       console.error(error);
@@ -341,6 +412,7 @@ const CreateLinkModal = ({ open, onOpenChange, initialUrl = "" }: CreateLinkModa
     setTimeLeft(900);
     setShowDomainInstructions(false);
     setNewCustomDomain("");
+    setUseBalance(false);
   };
 
   const handleClose = (open: boolean) => {
@@ -541,6 +613,48 @@ const CreateLinkModal = ({ open, onOpenChange, initialUrl = "" }: CreateLinkModa
 
             <div className="space-y-2">
               <Label>Select Payment Method</Label>
+              
+              {/* Use Balance Option */}
+              <button
+                onClick={() => {
+                  if (userBalance >= price) {
+                    setUseBalance(true);
+                    setSelectedCrypto("");
+                    setSelectedWallet(null);
+                  }
+                }}
+                disabled={userBalance < price}
+                className={`w-full p-3 rounded-lg border transition-all text-left ${
+                  useBalance
+                    ? "border-primary bg-primary/10"
+                    : userBalance >= price
+                    ? "border-border bg-secondary/50 hover:border-primary/50"
+                    : "border-border bg-secondary/30 opacity-60 cursor-not-allowed"
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <CreditCard className="w-4 h-4 text-primary" />
+                    <span className="font-medium text-foreground">Use Balance</span>
+                  </div>
+                  <span className={`text-sm ${userBalance >= price ? "text-green-500" : "text-muted-foreground"}`}>
+                    ${userBalance.toFixed(2)}
+                  </span>
+                </div>
+                {userBalance < price && (
+                  <p className="text-xs text-destructive mt-1">Insufficient funds (need ${price})</p>
+                )}
+              </button>
+
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t border-border" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-background px-2 text-muted-foreground">or pay with crypto</span>
+                </div>
+              </div>
+
               {wallets.length === 0 ? (
                 <div className="flex items-center gap-2 p-3 bg-destructive/10 rounded-lg text-destructive text-sm">
                   <AlertCircle className="w-4 h-4" />
@@ -554,9 +668,10 @@ const CreateLinkModal = ({ open, onOpenChange, initialUrl = "" }: CreateLinkModa
                       onClick={() => {
                         setSelectedCrypto(wallet.currency);
                         setSelectedWallet(wallet);
+                        setUseBalance(false);
                       }}
                       className={`p-3 rounded-lg border transition-all ${
-                        selectedCrypto === wallet.currency
+                        selectedCrypto === wallet.currency && !useBalance
                           ? "border-primary bg-primary/10"
                           : "border-border bg-secondary/50 hover:border-primary/50"
                       }`}
@@ -575,12 +690,14 @@ const CreateLinkModal = ({ open, onOpenChange, initialUrl = "" }: CreateLinkModa
 
             <Button
               onClick={handleCreateLink}
-              disabled={loading || !originalUrl || !selectedCrypto || wallets.length === 0}
+              disabled={loading || !originalUrl || (!useBalance && !selectedCrypto)}
               className="w-full"
               variant="pricing"
             >
               {loading ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
+              ) : useBalance ? (
+                `Pay $${price} from Balance`
               ) : (
                 "Proceed to Payment"
               )}
