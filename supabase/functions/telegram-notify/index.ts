@@ -68,11 +68,11 @@ serve(async (req) => {
         };
       }
     } else if (payload.type === 'fund_deposit') {
-      message = `💳 *Fund Deposit Request*\n\n` +
-        `💵 Amount: $${payload.amount} (${payload.currency})\n` +
-        `👤 User: ${payload.userEmail || 'Unknown'}\n` +
-        `📝 Transaction ID: \`${payload.transactionId || 'N/A'}\`\n\n` +
-        `⚠️ *Please verify payment and confirm in admin dashboard*`;
+      message = `💳 *New Fund Deposit Request*\n\n` +
+        `👤 *Deposited by:* ${payload.userEmail || 'Unknown user'}\n` +
+        `💵 *Amount:* $${payload.amount} (${payload.currency})\n` +
+        `📝 *Transaction ID:* \`${payload.transactionId || 'N/A'}\`\n\n` +
+        `⚠️ *Click the button below to confirm this deposit and credit the user's balance*`;
       
       // Add inline keyboard for fund deposits
       if (payload.transactionId) {

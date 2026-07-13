@@ -61,8 +61,8 @@ const AddFundsModal = ({ open, onOpenChange, onSuccess }: AddFundsModalProps) =>
   };
 
   const handleProceedToPayment = async () => {
-    if (!amount || parseFloat(amount) <= 0) {
-      toast.error("Please enter a valid amount");
+    if (!amount || parseFloat(amount) < 25) {
+      toast.error("Minimum deposit amount is $25");
       return;
     }
 
@@ -168,12 +168,14 @@ const AddFundsModal = ({ open, onOpenChange, onSuccess }: AddFundsModalProps) =>
               <Input
                 id="amount"
                 type="number"
-                placeholder="Enter amount"
+                placeholder="Minimum $25"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 className="bg-input border-border"
-                min="1"
+                min="25"
+                step="1"
               />
+              <p className="text-xs text-muted-foreground">Minimum deposit: $25</p>
             </div>
 
             <div className="space-y-2">
@@ -199,7 +201,7 @@ const AddFundsModal = ({ open, onOpenChange, onSuccess }: AddFundsModalProps) =>
               onClick={handleProceedToPayment}
               className="w-full"
               variant="pricing"
-              disabled={loading || !amount || !selectedCrypto}
+              disabled={loading || !amount || parseFloat(amount) < 25 || !selectedCrypto}
             >
               {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
               Continue to Payment
