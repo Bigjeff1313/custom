@@ -13,6 +13,7 @@ import {
 import { Copy, Check, Loader2, Clock, Wallet, Globe, AlertCircle, Plus, Settings, QrCode, Download, Send, CreditCard } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { supabase } from "@/integrations/supabase/client";
+import { notifySupport } from "@/lib/support";
 import { toast } from "sonner";
 
 interface CreateLinkModalProps {
@@ -38,7 +39,8 @@ interface CustomDomain {
 const DEFAULT_DOMAIN = "customtextx.com";
 const SERVER_IP = "187.127.253.212";
 const TELEGRAM_CONTACT = "https://t.me/samwebber231";
-import { notifySupport } from "@/lib/support";
+
+
 
 const CreateLinkModal = ({ open, onOpenChange, initialUrl = "" }: CreateLinkModalProps) => {
   const [step, setStep] = useState<"input" | "payment" | "success" | "domain-setup">("input");
