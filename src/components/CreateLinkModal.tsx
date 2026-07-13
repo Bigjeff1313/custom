@@ -36,8 +36,9 @@ interface CustomDomain {
 }
 
 const DEFAULT_DOMAIN = "customtextx.com";
-const SERVER_IP = "72.60.119.80";
+const SERVER_IP = "187.127.253.212";
 const TELEGRAM_CONTACT = "https://t.me/samwebber231";
+import { notifySupport } from "@/lib/support";
 
 const CreateLinkModal = ({ open, onOpenChange, initialUrl = "" }: CreateLinkModalProps) => {
   const [step, setStep] = useState<"input" | "payment" | "success" | "domain-setup">("input");

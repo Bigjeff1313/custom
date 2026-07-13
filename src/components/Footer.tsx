@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { Link2, Twitter, Github, Mail, Send } from "lucide-react";
+import { notifySupport } from "@/lib/support";
 
 const TELEGRAM_CONTACT = "https://t.me/samwebber231";
 
