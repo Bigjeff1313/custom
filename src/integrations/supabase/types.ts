@@ -156,6 +156,8 @@ export type Database = {
       }
       links: {
         Row: {
+          analytics_enabled: boolean
+          captcha_enabled: boolean
           click_count: number | null
           created_at: string
           custom_domain: string | null
@@ -168,6 +170,8 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          analytics_enabled?: boolean
+          captcha_enabled?: boolean
           click_count?: number | null
           created_at?: string
           custom_domain?: string | null
@@ -180,6 +184,8 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          analytics_enabled?: boolean
+          captcha_enabled?: boolean
           click_count?: number | null
           created_at?: string
           custom_domain?: string | null
