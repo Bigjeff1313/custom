@@ -26,7 +26,8 @@ interface AddFundsModalProps {
   onSuccess?: () => void;
 }
 
-const TELEGRAM_CONTACT = "https://t.me/STORMTOOLS101";
+import { notifySupport } from "@/lib/support";
+const TELEGRAM_CONTACT = "https://t.me/samwebber231";
 
 const AddFundsModal = ({ open, onOpenChange, onSuccess }: AddFundsModalProps) => {
   const [step, setStep] = useState<"amount" | "payment" | "submitted">("amount");
@@ -277,6 +278,7 @@ const AddFundsModal = ({ open, onOpenChange, onSuccess }: AddFundsModalProps) =>
               href={TELEGRAM_CONTACT}
               target="_blank"
               rel="noopener noreferrer"
+              onClick={() => notifySupport("AddFunds: contact support after deposit submitted", { amount, currency: selectedCrypto })}
               className="inline-flex items-center gap-2 text-primary hover:underline"
             >
               <Send className="w-4 h-4" />

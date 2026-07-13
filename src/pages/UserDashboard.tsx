@@ -47,7 +47,7 @@ import EditLinkModal from "@/components/EditLinkModal";
 import AddFundsModal from "@/components/AddFundsModal";
 import TransactionHistory from "@/components/TransactionHistory";
 
-const TELEGRAM_CONTACT = "https://t.me/STORMTOOLS101";
+const TELEGRAM_CONTACT = "https://t.me/samwebber231";
 
 type Link = Tables<"links">;
 type LinkClick = Tables<"link_clicks">;

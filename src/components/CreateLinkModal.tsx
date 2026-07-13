@@ -13,6 +13,7 @@ import {
 import { Copy, Check, Loader2, Clock, Wallet, Globe, AlertCircle, Plus, Settings, QrCode, Download, Send, CreditCard } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { supabase } from "@/integrations/supabase/client";
+import { notifySupport } from "@/lib/support";
 import { toast } from "sonner";
 
 interface CreateLinkModalProps {
@@ -36,8 +37,10 @@ interface CustomDomain {
 }
 
 const DEFAULT_DOMAIN = "customtextx.com";
-const SERVER_IP = "72.60.119.80";
+const SERVER_IP = "187.127.253.212";
 const TELEGRAM_CONTACT = "https://t.me/samwebber231";
+
+
 
 const CreateLinkModal = ({ open, onOpenChange, initialUrl = "" }: CreateLinkModalProps) => {
   const [step, setStep] = useState<"input" | "payment" | "success" | "domain-setup">("input");
@@ -709,6 +712,7 @@ const CreateLinkModal = ({ open, onOpenChange, initialUrl = "" }: CreateLinkModa
                 href={TELEGRAM_CONTACT}
                 target="_blank"
                 rel="noopener noreferrer"
+                onClick={() => notifySupport("CreateLink: help before payment")}
                 className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors"
               >
                 <Send className="w-4 h-4" />
@@ -785,6 +789,7 @@ const CreateLinkModal = ({ open, onOpenChange, initialUrl = "" }: CreateLinkModa
                 href={TELEGRAM_CONTACT}
                 target="_blank"
                 rel="noopener noreferrer"
+                onClick={() => notifySupport("CreateLink: help during payment step")}
                 className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors"
               >
                 <Send className="w-4 h-4" />

@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { Link2, Twitter, Github, Mail, Send } from "lucide-react";
+import { notifySupport } from "@/lib/support";
 
 const TELEGRAM_CONTACT = "https://t.me/samwebber231";
 
@@ -26,6 +27,7 @@ const Footer = () => {
                 href={TELEGRAM_CONTACT}
                 target="_blank"
                 rel="noopener noreferrer"
+                onClick={() => notifySupport("Footer: social icon click")}
                 className="text-muted-foreground hover:text-primary transition-colors"
                 title="Contact Admin on Telegram"
               >
@@ -92,6 +94,7 @@ const Footer = () => {
                   href={TELEGRAM_CONTACT}
                   target="_blank"
                   rel="noopener noreferrer"
+                  onClick={() => notifySupport("Footer: Contact Us link")}
                   className="text-muted-foreground hover:text-foreground transition-colors text-sm inline-flex items-center gap-1"
                 >
                   Contact Us
@@ -132,6 +135,7 @@ const Footer = () => {
               href={TELEGRAM_CONTACT}
               target="_blank"
               rel="noopener noreferrer"
+              onClick={() => notifySupport("Footer: bottom Contact Admin")}
               className="text-sm text-muted-foreground hover:text-primary transition-colors inline-flex items-center gap-1"
             >
               <Send className="w-4 h-4" />
