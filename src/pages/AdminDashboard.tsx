@@ -694,6 +694,60 @@ const AdminDashboard = () => {
     fetchLinks();
   };
 
+  const handleConfirmDeposit = async (depositId: string, userId: string, amount: number) => {
+    // Update deposit status to confirmed
+    const { error: depositError } = await supabase
+      .from("fund_transactions")
+      .update({ status: "confirmed" })
+      .eq("id", depositId);
+
+    if (depositError) {
+      toast.error("Failed to confirm deposit");
+      return;
+    }
+
+    // Update user funds balance
+    const { data: existingFunds, error: fundsError } = await supabase
+      .from("user_funds")
+      .select("*")
+      .eq("user_id", userId)
+      .single();
+
+    if (fundsError && fundsError.code !== "PGRST116") {
+      toast.error("Failed to fetch user funds");
+      return;
+    }
+
+    if (existingFunds) {
+      const { error: updateError } = await supabase
+        .from("user_funds")
+        .update({
+          balance: Number(existingFunds.balance) + amount,
+          total_deposited: Number(existingFunds.total_deposited) + amount,
+        })
+        .eq("user_id", userId);
+
+      if (updateError) {
+        toast.error("Deposit confirmed but failed to update balance");
+        return;
+      }
+    } else {
+      const { error: insertError } = await supabase.from("user_funds").insert({
+        user_id: userId,
+        balance: amount,
+        total_deposited: amount,
+      });
+
+      if (insertError) {
+        toast.error("Deposit confirmed but failed to create balance");
+        return;
+      }
+    }
+
+    toast.success("Deposit confirmed and balance updated!");
+    fetchDeposits();
+  };
+
   const copyToClipboard = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
     setCopied(id);
