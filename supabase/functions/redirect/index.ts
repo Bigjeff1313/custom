@@ -129,40 +129,47 @@ serve(async (req) => {
     // Get location from IP
     const { country, city, region } = await getLocationFromIP(ip);
 
-    // Record the click with detailed info
-    const { error: clickError } = await supabase
-      .from('link_clicks')
-      .insert({
-        link_id: link.id,
-        ip_address: ip,
-        user_agent: ua.substring(0, 500), // Limit length
-        device_type: deviceType,
-        browser: browser,
-        os: os,
-        country: country,
-        city: city,
-        region: region,
-      });
+    // Record click + increment count only if analytics is enabled for this link
+    if (link.analytics_enabled !== false) {
+      const { error: clickError } = await supabase
+        .from('link_clicks')
+        .insert({
+          link_id: link.id,
+          ip_address: ip,
+          user_agent: ua.substring(0, 500),
+          device_type: deviceType,
+          browser: browser,
+          os: os,
+          country: country,
+          city: city,
+          region: region,
+        });
 
-    if (clickError) {
-      console.error('Error recording click:', clickError);
+      if (clickError) {
+        console.error('Error recording click:', clickError);
+      }
+
+      await supabase
+        .from('links')
+        .update({ click_count: (link.click_count || 0) + 1 })
+        .eq('id', link.id);
+    } else {
+      console.log(`Analytics disabled for ${shortCode} — skipping click record`);
     }
 
-    // Increment click count on link
-    await supabase
-      .from('links')
-      .update({ click_count: (link.click_count || 0) + 1 })
-      .eq('id', link.id);
 
     console.log(`Redirect success: ${shortCode} -> ${link.original_url} (${deviceType}, ${browser}, ${country})`);
 
     return new Response(JSON.stringify({ 
       success: true, 
       originalUrl: link.original_url,
-      clickCount: (link.click_count || 0) + 1
+      clickCount: (link.analytics_enabled !== false ? (link.click_count || 0) + 1 : link.click_count || 0),
+      captchaEnabled: link.captcha_enabled !== false,
+      analyticsEnabled: link.analytics_enabled !== false,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
+
 
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
