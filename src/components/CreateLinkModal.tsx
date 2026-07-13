@@ -789,6 +789,7 @@ const CreateLinkModal = ({ open, onOpenChange, initialUrl = "" }: CreateLinkModa
                 href={TELEGRAM_CONTACT}
                 target="_blank"
                 rel="noopener noreferrer"
+                onClick={() => notifySupport("CreateLink: help during payment step")}
                 className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors"
               >
                 <Send className="w-4 h-4" />
