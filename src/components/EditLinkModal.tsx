@@ -212,6 +212,35 @@ const EditLinkModal = ({ open, onOpenChange, link, onSuccess }: EditLinkModalPro
             </div>
           )}
 
+          {/* Feature toggles */}
+          <div className="space-y-3 pt-2 border-t border-border">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Link Features</p>
+
+            <div className="flex items-center justify-between p-3 bg-secondary/30 rounded-lg">
+              <div className="flex items-start gap-3">
+                <ShieldCheck className="w-4 h-4 text-primary mt-0.5" />
+                <div>
+                  <Label htmlFor="captcha-toggle" className="cursor-pointer">Human Verification (CAPTCHA)</Label>
+                  <p className="text-xs text-muted-foreground">Require visitors to confirm they're not a bot</p>
+                </div>
+              </div>
+              <Switch id="captcha-toggle" checked={captchaEnabled} onCheckedChange={setCaptchaEnabled} />
+            </div>
+
+            <div className="flex items-center justify-between p-3 bg-secondary/30 rounded-lg">
+              <div className="flex items-start gap-3">
+                <BarChart3 className="w-4 h-4 text-primary mt-0.5" />
+                <div>
+                  <Label htmlFor="analytics-toggle" className="cursor-pointer">Click Analytics</Label>
+                  <p className="text-xs text-muted-foreground">Track clicks, devices, and locations</p>
+                </div>
+              </div>
+              <Switch id="analytics-toggle" checked={analyticsEnabled} onCheckedChange={setAnalyticsEnabled} />
+            </div>
+          </div>
+
+
+
           <div className="flex gap-2 pt-4">
             <Button
               variant="outline"
