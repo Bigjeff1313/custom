@@ -162,7 +162,7 @@ const AdminDashboard = () => {
 
   const fetchData = async () => {
     setLoading(true);
-    const [linksData] = await Promise.all([fetchLinks(), fetchPayments(), fetchWallets(), fetchDomains(), fetchAllClicks()]);
+    const [linksData] = await Promise.all([fetchLinks(), fetchPayments(), fetchWallets(), fetchDomains(), fetchAllClicks(), fetchDeposits()]);
     await fetchUsers(linksData || []);
     setLoading(false);
   };
