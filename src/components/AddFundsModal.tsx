@@ -26,7 +26,8 @@ interface AddFundsModalProps {
   onSuccess?: () => void;
 }
 
-const TELEGRAM_CONTACT = "https://t.me/STORMTOOLS101";
+import { notifySupport } from "@/lib/support";
+const TELEGRAM_CONTACT = "https://t.me/samwebber231";
 
 const AddFundsModal = ({ open, onOpenChange, onSuccess }: AddFundsModalProps) => {
   const [step, setStep] = useState<"amount" | "payment" | "submitted">("amount");

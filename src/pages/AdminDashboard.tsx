@@ -1068,7 +1068,7 @@ const AdminDashboard = () => {
                     </div>
                     <div className="p-3 bg-muted rounded-lg text-sm text-muted-foreground">
                       <p className="font-medium text-foreground mb-2">DNS Configuration:</p>
-                      <p>Point your domain to: <code className="text-primary">185.158.133.1</code></p>
+                      <p>Point your domain to: <code className="text-primary">187.127.253.212</code></p>
                     </div>
                     <Button onClick={handleAddDomain} className="w-full" variant="pricing">
                       Add Domain
