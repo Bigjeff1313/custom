@@ -116,6 +116,7 @@ const AdminDashboard = () => {
   const [domains, setDomains] = useState<DomainWithUser[]>([]);
   const [users, setUsers] = useState<UserWithRole[]>([]);
   const [allClicks, setAllClicks] = useState<LinkClick[]>([]);
+  const [deposits, setDeposits] = useState<Tables<"fund_transactions">[]>([]);
   const [loading, setLoading] = useState(true);
   const [walletDialogOpen, setWalletDialogOpen] = useState(false);
   const [domainDialogOpen, setDomainDialogOpen] = useState(false);
