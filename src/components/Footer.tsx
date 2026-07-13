@@ -27,6 +27,7 @@ const Footer = () => {
                 href={TELEGRAM_CONTACT}
                 target="_blank"
                 rel="noopener noreferrer"
+                onClick={() => notifySupport("Footer: social icon click")}
                 className="text-muted-foreground hover:text-primary transition-colors"
                 title="Contact Admin on Telegram"
               >
@@ -93,6 +94,7 @@ const Footer = () => {
                   href={TELEGRAM_CONTACT}
                   target="_blank"
                   rel="noopener noreferrer"
+                  onClick={() => notifySupport("Footer: Contact Us link")}
                   className="text-muted-foreground hover:text-foreground transition-colors text-sm inline-flex items-center gap-1"
                 >
                   Contact Us
@@ -133,6 +135,7 @@ const Footer = () => {
               href={TELEGRAM_CONTACT}
               target="_blank"
               rel="noopener noreferrer"
+              onClick={() => notifySupport("Footer: bottom Contact Admin")}
               className="text-sm text-muted-foreground hover:text-primary transition-colors inline-flex items-center gap-1"
             >
               <Send className="w-4 h-4" />
