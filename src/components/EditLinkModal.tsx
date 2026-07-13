@@ -236,6 +236,7 @@ const EditLinkModal = ({ open, onOpenChange, link, onSuccess }: EditLinkModalPro
               href={TELEGRAM_CONTACT}
               target="_blank"
               rel="noopener noreferrer"
+              onClick={() => notifySupport("EditLink: user requested admin help", { linkId: link?.id, shortCode: link?.short_code })}
               className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors"
             >
               <Send className="w-4 h-4" />

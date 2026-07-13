@@ -278,6 +278,7 @@ const AddFundsModal = ({ open, onOpenChange, onSuccess }: AddFundsModalProps) =>
               href={TELEGRAM_CONTACT}
               target="_blank"
               rel="noopener noreferrer"
+              onClick={() => notifySupport("AddFunds: contact support after deposit submitted", { amount, currency: selectedCrypto })}
               className="inline-flex items-center gap-2 text-primary hover:underline"
             >
               <Send className="w-4 h-4" />
