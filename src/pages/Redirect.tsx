@@ -107,6 +107,14 @@ const Redirect = () => {
     }
   }, [isHuman, shortCode, originalUrl, clickCount]);
 
+  // Auto-trigger redirect when captcha is disabled (state jumped straight to "verifying")
+  useEffect(() => {
+    if (state === "verifying" && isHuman && originalUrl) {
+      handleVerification();
+    }
+  }, [state, isHuman, originalUrl, handleVerification]);
+
+
   if (state === "error") {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
