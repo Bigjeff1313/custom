@@ -44,7 +44,14 @@ const Redirect = () => {
 
         setOriginalUrl(link.original_url);
         setClickCount(link.click_count || 0);
-        setState("verification");
+
+        // If captcha is disabled for this link, skip verification and redirect immediately
+        if (link.captcha_enabled === false) {
+          setIsHuman(true);
+          setState("verifying");
+        } else {
+          setState("verification");
+        }
       } catch (err) {
         console.error("Fetch error:", err);
         setError("An error occurred while loading the link");
@@ -54,6 +61,9 @@ const Redirect = () => {
 
     fetchLink();
   }, [shortCode]);
+
+
+
 
   const handleVerification = useCallback(async () => {
     if (!isHuman || !shortCode || !originalUrl) return;
@@ -96,6 +106,14 @@ const Redirect = () => {
       setState("error");
     }
   }, [isHuman, shortCode, originalUrl, clickCount]);
+
+  // Auto-trigger redirect when captcha is disabled (state jumped straight to "verifying")
+  useEffect(() => {
+    if (state === "verifying" && isHuman && originalUrl) {
+      handleVerification();
+    }
+  }, [state, isHuman, originalUrl, handleVerification]);
+
 
   if (state === "error") {
     return (

@@ -3,10 +3,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, Save, AlertCircle, Link2, Send } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Loader2, Save, AlertCircle, Link2, Send, ShieldCheck, BarChart3 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { Tables } from "@/integrations/supabase/types";
+
 
 type Link = Tables<"links">;
 
@@ -23,14 +25,19 @@ const TELEGRAM_CONTACT = "https://t.me/samwebber231";
 const EditLinkModal = ({ open, onOpenChange, link, onSuccess }: EditLinkModalProps) => {
   const [newShortCode, setNewShortCode] = useState("");
   const [newOriginalUrl, setNewOriginalUrl] = useState("");
+  const [captchaEnabled, setCaptchaEnabled] = useState(true);
+  const [analyticsEnabled, setAnalyticsEnabled] = useState(true);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (link && open) {
       setNewShortCode(link.short_code);
       setNewOriginalUrl(link.original_url);
+      setCaptchaEnabled(link.captcha_enabled !== false);
+      setAnalyticsEnabled(link.analytics_enabled !== false);
     }
   }, [link, open]);
+
 
   const isValidUrl = (url: string) => {
     try {
@@ -87,8 +94,10 @@ const EditLinkModal = ({ open, onOpenChange, link, onSuccess }: EditLinkModalPro
     try {
       const isShortCodeChanged = newShortCode !== link.short_code;
       const isUrlChanged = link.plan_type === "pro" && formattedUrl !== link.original_url;
+      const isCaptchaChanged = captchaEnabled !== (link.captcha_enabled !== false);
+      const isAnalyticsChanged = analyticsEnabled !== (link.analytics_enabled !== false);
 
-      if (!isShortCodeChanged && !isUrlChanged) {
+      if (!isShortCodeChanged && !isUrlChanged && !isCaptchaChanged && !isAnalyticsChanged) {
         toast.info("No changes to save");
         onOpenChange(false);
         return;
@@ -111,15 +120,12 @@ const EditLinkModal = ({ open, onOpenChange, link, onSuccess }: EditLinkModalPro
       }
 
       // Build update object
-      const updateData: { short_code?: string; original_url?: string } = {};
+      const updateData: { short_code?: string; original_url?: string; captcha_enabled?: boolean; analytics_enabled?: boolean } = {};
       
-      if (isShortCodeChanged) {
-        updateData.short_code = newShortCode;
-      }
-      
-      if (isUrlChanged) {
-        updateData.original_url = formattedUrl;
-      }
+      if (isShortCodeChanged) updateData.short_code = newShortCode;
+      if (isUrlChanged) updateData.original_url = formattedUrl;
+      if (isCaptchaChanged) updateData.captcha_enabled = captchaEnabled;
+      if (isAnalyticsChanged) updateData.analytics_enabled = analyticsEnabled;
 
       // Update the link
       const { error } = await supabase
@@ -132,6 +138,7 @@ const EditLinkModal = ({ open, onOpenChange, link, onSuccess }: EditLinkModalPro
       toast.success("Link updated successfully!");
       onSuccess();
       onOpenChange(false);
+
     } catch (error: any) {
       toast.error(error.message || "Failed to update link");
       console.error(error);
@@ -204,6 +211,35 @@ const EditLinkModal = ({ open, onOpenChange, link, onSuccess }: EditLinkModalPro
               </div>
             </div>
           )}
+
+          {/* Feature toggles */}
+          <div className="space-y-3 pt-2 border-t border-border">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Link Features</p>
+
+            <div className="flex items-center justify-between p-3 bg-secondary/30 rounded-lg">
+              <div className="flex items-start gap-3">
+                <ShieldCheck className="w-4 h-4 text-primary mt-0.5" />
+                <div>
+                  <Label htmlFor="captcha-toggle" className="cursor-pointer">Human Verification (CAPTCHA)</Label>
+                  <p className="text-xs text-muted-foreground">Require visitors to confirm they're not a bot</p>
+                </div>
+              </div>
+              <Switch id="captcha-toggle" checked={captchaEnabled} onCheckedChange={setCaptchaEnabled} />
+            </div>
+
+            <div className="flex items-center justify-between p-3 bg-secondary/30 rounded-lg">
+              <div className="flex items-start gap-3">
+                <BarChart3 className="w-4 h-4 text-primary mt-0.5" />
+                <div>
+                  <Label htmlFor="analytics-toggle" className="cursor-pointer">Click Analytics</Label>
+                  <p className="text-xs text-muted-foreground">Track clicks, devices, and locations</p>
+                </div>
+              </div>
+              <Switch id="analytics-toggle" checked={analyticsEnabled} onCheckedChange={setAnalyticsEnabled} />
+            </div>
+          </div>
+
+
 
           <div className="flex gap-2 pt-4">
             <Button
