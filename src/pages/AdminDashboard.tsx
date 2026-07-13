@@ -71,6 +71,7 @@ import {
   MapPin,
   CheckCircle,
   XCircle,
+  Banknote,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -115,6 +116,7 @@ const AdminDashboard = () => {
   const [domains, setDomains] = useState<DomainWithUser[]>([]);
   const [users, setUsers] = useState<UserWithRole[]>([]);
   const [allClicks, setAllClicks] = useState<LinkClick[]>([]);
+  const [deposits, setDeposits] = useState<Tables<"fund_transactions">[]>([]);
   const [loading, setLoading] = useState(true);
   const [walletDialogOpen, setWalletDialogOpen] = useState(false);
   const [domainDialogOpen, setDomainDialogOpen] = useState(false);
@@ -160,7 +162,7 @@ const AdminDashboard = () => {
 
   const fetchData = async () => {
     setLoading(true);
-    const [linksData] = await Promise.all([fetchLinks(), fetchPayments(), fetchWallets(), fetchDomains(), fetchAllClicks()]);
+    const [linksData] = await Promise.all([fetchLinks(), fetchPayments(), fetchWallets(), fetchDomains(), fetchAllClicks(), fetchDeposits()]);
     await fetchUsers(linksData || []);
     setLoading(false);
   };
@@ -184,6 +186,16 @@ const AdminDashboard = () => {
 
     if (data) setPayments(data);
     if (error) toast.error("Failed to load payments");
+  };
+
+  const fetchDeposits = async () => {
+    const { data, error } = await supabase
+      .from("fund_transactions")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (data) setDeposits(data);
+    if (error) toast.error("Failed to load deposits");
   };
 
   const fetchWallets = async () => {
@@ -682,6 +694,60 @@ const AdminDashboard = () => {
     fetchLinks();
   };
 
+  const handleConfirmDeposit = async (depositId: string, userId: string, amount: number) => {
+    // Update deposit status to confirmed
+    const { error: depositError } = await supabase
+      .from("fund_transactions")
+      .update({ status: "confirmed" })
+      .eq("id", depositId);
+
+    if (depositError) {
+      toast.error("Failed to confirm deposit");
+      return;
+    }
+
+    // Update user funds balance
+    const { data: existingFunds, error: fundsError } = await supabase
+      .from("user_funds")
+      .select("*")
+      .eq("user_id", userId)
+      .single();
+
+    if (fundsError && fundsError.code !== "PGRST116") {
+      toast.error("Failed to fetch user funds");
+      return;
+    }
+
+    if (existingFunds) {
+      const { error: updateError } = await supabase
+        .from("user_funds")
+        .update({
+          balance: Number(existingFunds.balance) + amount,
+          total_deposited: Number(existingFunds.total_deposited) + amount,
+        })
+        .eq("user_id", userId);
+
+      if (updateError) {
+        toast.error("Deposit confirmed but failed to update balance");
+        return;
+      }
+    } else {
+      const { error: insertError } = await supabase.from("user_funds").insert({
+        user_id: userId,
+        balance: amount,
+        total_deposited: amount,
+      });
+
+      if (insertError) {
+        toast.error("Deposit confirmed but failed to create balance");
+        return;
+      }
+    }
+
+    toast.success("Deposit confirmed and balance updated!");
+    fetchDeposits();
+  };
+
   const copyToClipboard = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
     setCopied(id);
@@ -823,6 +889,10 @@ const AdminDashboard = () => {
             <TabsTrigger value="payments" className="gap-2">
               <CreditCard className="w-4 h-4" />
               Payments
+            </TabsTrigger>
+            <TabsTrigger value="deposits" className="gap-2">
+              <Banknote className="w-4 h-4" />
+              Deposits
             </TabsTrigger>
             <TabsTrigger value="users" className="gap-2">
               <Users className="w-4 h-4" />
@@ -1439,6 +1509,83 @@ const AdminDashboard = () => {
                         </TableCell>
                       </TableRow>
                     ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </TabsContent>
+
+          {/* Deposits Tab */}
+          <TabsContent value="deposits" className="space-y-4">
+            <div className="flex justify-between items-center">
+              <div>
+                <h2 className="font-heading text-lg font-semibold text-foreground">Fund Deposits</h2>
+                <p className="text-sm text-muted-foreground">
+                  {deposits.filter(d => d.status === "confirmed").length} confirmed, {deposits.filter(d => d.status === "pending").length} pending
+                </p>
+              </div>
+            </div>
+            <div className="glass rounded-xl overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-border">
+                    <TableHead className="text-muted-foreground">User</TableHead>
+                    <TableHead className="text-muted-foreground">Amount</TableHead>
+                    <TableHead className="text-muted-foreground">Currency</TableHead>
+                    <TableHead className="text-muted-foreground">Wallet Address</TableHead>
+                    <TableHead className="text-muted-foreground">Status</TableHead>
+                    <TableHead className="text-muted-foreground">Created</TableHead>
+                    <TableHead className="text-muted-foreground text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {deposits.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                        No deposits yet
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    deposits.map((deposit) => {
+                      const depositUser = users.find(u => u.id === deposit.user_id);
+                      return (
+                        <TableRow key={deposit.id} className="border-border">
+                          <TableCell className="text-foreground">
+                            {depositUser?.email || `User ${deposit.user_id.slice(0, 8)}...`}
+                          </TableCell>
+                          <TableCell className="font-bold text-foreground">${deposit.amount}</TableCell>
+                          <TableCell className="text-foreground">{deposit.currency}</TableCell>
+                          <TableCell>
+                            <code className="text-xs text-muted-foreground max-w-[120px] truncate block">
+                              {deposit.wallet_address}
+                            </code>
+                          </TableCell>
+                          <TableCell>
+                            <span className={`px-2 py-1 rounded-full text-xs ${getStatusColor(deposit.status)}`}>
+                              {deposit.status}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground text-sm">
+                            {formatDate(deposit.created_at)}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              {deposit.status === "pending" && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 text-green-500 hover:text-green-600 hover:bg-green-500/10"
+                                  onClick={() => handleConfirmDeposit(deposit.id, deposit.user_id, Number(deposit.amount))}
+                                >
+                                  <CheckCircle className="w-4 h-4 mr-1" />
+                                  Confirm
+                                </Button>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
                   )}
                 </TableBody>
               </Table>
