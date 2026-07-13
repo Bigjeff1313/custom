@@ -6,7 +6,7 @@ const corsHeaders = {
 };
 
 interface NotificationPayload {
-  type: 'domain_added' | 'payment_confirmed' | 'payment_submitted' | 'fund_deposit';
+  type: 'domain_added' | 'payment_confirmed' | 'payment_submitted' | 'fund_deposit' | 'support_request';
   domain?: string;
   userEmail?: string;
   amount?: number;
@@ -16,6 +16,8 @@ interface NotificationPayload {
   transactionHash?: string;
   paymentId?: string;
   transactionId?: string;
+  context?: string;
+  extra?: Record<string, unknown> | null;
 }
 
 serve(async (req) => {
@@ -85,6 +87,12 @@ serve(async (req) => {
           ]]
         };
       }
+    } else if (payload.type === 'support_request') {
+      const extraText = payload.extra ? `\n📎 *Details:* \`${JSON.stringify(payload.extra)}\`` : '';
+      message = `🆘 *Support Request / Error Report*\n\n` +
+        `👤 *From:* ${payload.userEmail || 'Anonymous visitor'}\n` +
+        `📝 *Context:* ${payload.context || 'No context provided'}${extraText}\n\n` +
+        `Reply on Telegram: https://t.me/samwebber231`;
     } else {
       return new Response(
         JSON.stringify({ error: 'Invalid notification type' }),
