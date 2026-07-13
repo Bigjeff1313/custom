@@ -890,6 +890,10 @@ const AdminDashboard = () => {
               <CreditCard className="w-4 h-4" />
               Payments
             </TabsTrigger>
+            <TabsTrigger value="deposits" className="gap-2">
+              <Banknote className="w-4 h-4" />
+              Deposits
+            </TabsTrigger>
             <TabsTrigger value="users" className="gap-2">
               <Users className="w-4 h-4" />
               Users
