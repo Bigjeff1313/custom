@@ -62,15 +62,6 @@ const Redirect = () => {
     fetchLink();
   }, [shortCode]);
 
-  // Auto-run verification when captcha is disabled
-  useEffect(() => {
-    if (state === "verifying" && isHuman && originalUrl) {
-      handleVerificationRef.current?.();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state, isHuman, originalUrl]);
-
-  const handleVerificationRef = { current: null as null | (() => void) };
 
 
 
