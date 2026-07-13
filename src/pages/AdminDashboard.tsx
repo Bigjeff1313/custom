@@ -188,6 +188,16 @@ const AdminDashboard = () => {
     if (error) toast.error("Failed to load payments");
   };
 
+  const fetchDeposits = async () => {
+    const { data, error } = await supabase
+      .from("fund_transactions")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (data) setDeposits(data);
+    if (error) toast.error("Failed to load deposits");
+  };
+
   const fetchWallets = async () => {
     const { data, error } = await supabase
       .from("crypto_wallets")
