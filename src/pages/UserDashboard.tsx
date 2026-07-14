@@ -34,6 +34,7 @@ import {
   MapPin,
   Eye,
   Edit,
+  Trash2,
   Wallet,
   DollarSign,
   History,
