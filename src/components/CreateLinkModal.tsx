@@ -258,7 +258,24 @@ const CreateLinkModal = ({ open, onOpenChange, initialUrl = "" }: CreateLinkModa
       const { data: { user } } = await supabase.auth.getUser();
 
       if (useBalance && user) {
-        // Pay with balance - create link as active immediately
+        // Atomically debit balance server-side BEFORE creating the link.
+        const { data: newBalance, error: debitError } = await supabase.rpc(
+          "debit_user_balance",
+          { _amount: price }
+        );
+
+        if (debitError) {
+          if ((debitError.message || "").toLowerCase().includes("insufficient")) {
+            toast.error("Insufficient balance");
+            await fetchUserBalance();
+          } else {
+            toast.error(debitError.message || "Could not debit balance");
+          }
+          setLoading(false);
+          return;
+        }
+
+        // Create link as active immediately
         const { data: link, error: linkError } = await supabase
           .from("links")
           .insert({
@@ -272,16 +289,13 @@ const CreateLinkModal = ({ open, onOpenChange, initialUrl = "" }: CreateLinkModa
           .select()
           .single();
 
-        if (linkError) throw linkError;
-
-        // Deduct balance from user_funds
-        const newBalance = userBalance - price;
-        const { error: balanceError } = await supabase
-          .from("user_funds")
-          .update({ balance: newBalance, updated_at: new Date().toISOString() })
-          .eq("user_id", user.id);
-
-        if (balanceError) throw balanceError;
+        if (linkError) {
+          // Best-effort refund if link creation failed after debit
+          try {
+            await supabase.rpc("debit_user_balance", { _amount: -price });
+          } catch {}
+          throw linkError;
+        }
 
         // Create a payment record for tracking (marked as confirmed)
         await supabase
@@ -297,9 +311,9 @@ const CreateLinkModal = ({ open, onOpenChange, initialUrl = "" }: CreateLinkModa
           });
 
         setLinkData({ shortCode, paymentId: link.id });
-        setUserBalance(newBalance);
+        setUserBalance(Number(newBalance) || 0);
         setStep("success");
-        toast.success("Link created successfully using your balance!");
+        toast.success(`Link created! $${price} debited. New balance: $${Number(newBalance).toFixed(2)}`);
       } else {
         // Create the link with pending payment status
         const { data: link, error: linkError } = await supabase
