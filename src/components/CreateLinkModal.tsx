@@ -61,6 +61,7 @@ const CreateLinkModal = ({ open, onOpenChange, initialUrl = "" }: CreateLinkModa
   const [addingDomain, setAddingDomain] = useState(false);
   const [userBalance, setUserBalance] = useState<number>(0);
   const [useBalance, setUseBalance] = useState(false);
+  const [txHash, setTxHash] = useState("");
 
   const price = selectedPlan === "basic" ? 5 : 10;
 
