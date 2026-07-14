@@ -34,6 +34,7 @@ import {
   MapPin,
   Eye,
   Edit,
+  Trash2,
   Wallet,
   DollarSign,
   History,
@@ -73,6 +74,32 @@ const UserDashboard = () => {
   useEffect(() => {
     checkAuth();
   }, []);
+
+  // Real-time subscription for links
+  useEffect(() => {
+    if (!user) return;
+    const channel = supabase
+      .channel(`user-links-${user.id}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "links", filter: `user_id=eq.${user.id}` },
+        () => fetchLinks(user.id)
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "user_funds", filter: `user_id=eq.${user.id}` },
+        () => fetchUserBalance(user.id)
+      )
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "link_clicks" },
+        () => fetchLinks(user.id)
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
 
   const checkAuth = async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -157,6 +184,17 @@ const UserDashboard = () => {
 
   const handleLinkCreated = () => {
     setCreateDialogOpen(false);
+    if (user) fetchLinks(user.id);
+  };
+
+  const handleDeleteLink = async (link: Link) => {
+    if (!confirm(`Delete ${link.custom_domain}/${link.short_code}? This cannot be undone.`)) return;
+    const { error } = await supabase.from("links").delete().eq("id", link.id);
+    if (error) {
+      toast.error(error.message || "Failed to delete link");
+      return;
+    }
+    toast.success("Link deleted");
     if (user) fetchLinks(user.id);
   };
 
@@ -440,6 +478,15 @@ const UserDashboard = () => {
                             >
                               <Eye className="w-4 h-4" />
                               View
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteLink(link)}
+                              className="gap-1 text-red-500 hover:text-red-500 hover:bg-red-500/10"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                              Delete
                             </Button>
                           </div>
                         </TableCell>
