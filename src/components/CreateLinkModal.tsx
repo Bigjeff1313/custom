@@ -436,7 +436,7 @@ const CreateLinkModal = ({ open, onOpenChange, initialUrl = "" }: CreateLinkModa
     setShowDomainInstructions(false);
     setNewCustomDomain("");
     setUseBalance(false);
-  };
+    setTxHash("");
 
   const handleClose = (open: boolean) => {
     if (!open) resetModal();
