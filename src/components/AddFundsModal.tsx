@@ -254,6 +254,19 @@ const AddFundsModal = ({ open, onOpenChange, onSuccess }: AddFundsModalProps) =>
               </div>
             </div>
 
+            <div className="space-y-2">
+              <Label htmlFor="deposit-tx-hash">
+                Transaction Hash <span className="text-muted-foreground font-normal">(optional)</span>
+              </Label>
+              <Input
+                id="deposit-tx-hash"
+                placeholder="Paste your tx hash to speed up confirmation"
+                value={txHash}
+                onChange={(e) => setTxHash(e.target.value)}
+                className="bg-input border-border font-mono text-xs"
+              />
+            </div>
+
             <div className="p-3 bg-amber-500/10 rounded-lg border border-amber-500/20">
               <p className="text-sm text-amber-500 flex items-center gap-2">
                 <Clock className="w-4 h-4" />
