@@ -479,6 +479,15 @@ const UserDashboard = () => {
                               <Eye className="w-4 h-4" />
                               View
                             </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteLink(link)}
+                              className="gap-1 text-red-500 hover:text-red-500 hover:bg-red-500/10"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                              Delete
+                            </Button>
                           </div>
                         </TableCell>
                       </TableRow>
