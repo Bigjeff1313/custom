@@ -38,6 +38,7 @@ const AddFundsModal = ({ open, onOpenChange, onSuccess }: AddFundsModalProps) =>
   const [transactionId, setTransactionId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [txHash, setTxHash] = useState("");
 
   useEffect(() => {
     if (open) {
@@ -104,6 +105,14 @@ const AddFundsModal = ({ open, onOpenChange, onSuccess }: AddFundsModalProps) =>
   const handleSubmitPayment = async () => {
     setLoading(true);
     try {
+      // Save optional transaction hash on the deposit record
+      if (txHash.trim() && transactionId) {
+        await supabase
+          .from("fund_transactions")
+          .update({ transaction_hash: txHash.trim() })
+          .eq("id", transactionId);
+      }
+
       // Notify admin via Telegram about pending deposit
       const { data: { user } } = await supabase.auth.getUser();
       await supabase.functions.invoke('telegram-notify', {
@@ -113,6 +122,7 @@ const AddFundsModal = ({ open, onOpenChange, onSuccess }: AddFundsModalProps) =>
           currency: selectedCrypto,
           userEmail: user?.email || 'Unknown',
           transactionId: transactionId,
+          transactionHash: txHash.trim() || 'N/A',
         }
       });
 
@@ -140,6 +150,7 @@ const AddFundsModal = ({ open, onOpenChange, onSuccess }: AddFundsModalProps) =>
     setSelectedCrypto("");
     setSelectedWallet(null);
     setTransactionId(null);
+    setTxHash("");
   };
 
   const handleClose = (openState: boolean) => {
@@ -241,6 +252,19 @@ const AddFundsModal = ({ open, onOpenChange, onSuccess }: AddFundsModalProps) =>
                   )}
                 </Button>
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="deposit-tx-hash">
+                Transaction Hash <span className="text-muted-foreground font-normal">(optional)</span>
+              </Label>
+              <Input
+                id="deposit-tx-hash"
+                placeholder="Paste your tx hash to speed up confirmation"
+                value={txHash}
+                onChange={(e) => setTxHash(e.target.value)}
+                className="bg-input border-border font-mono text-xs"
+              />
             </div>
 
             <div className="p-3 bg-amber-500/10 rounded-lg border border-amber-500/20">

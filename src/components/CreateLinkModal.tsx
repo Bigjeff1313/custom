@@ -61,6 +61,7 @@ const CreateLinkModal = ({ open, onOpenChange, initialUrl = "" }: CreateLinkModa
   const [addingDomain, setAddingDomain] = useState(false);
   const [userBalance, setUserBalance] = useState<number>(0);
   const [useBalance, setUseBalance] = useState(false);
+  const [txHash, setTxHash] = useState("");
 
   const price = selectedPlan === "basic" ? 5 : 10;
 
@@ -257,7 +258,24 @@ const CreateLinkModal = ({ open, onOpenChange, initialUrl = "" }: CreateLinkModa
       const { data: { user } } = await supabase.auth.getUser();
 
       if (useBalance && user) {
-        // Pay with balance - create link as active immediately
+        // Atomically debit balance server-side BEFORE creating the link.
+        const { data: newBalance, error: debitError } = await supabase.rpc(
+          "debit_user_balance",
+          { _amount: price }
+        );
+
+        if (debitError) {
+          if ((debitError.message || "").toLowerCase().includes("insufficient")) {
+            toast.error("Insufficient balance");
+            await fetchUserBalance();
+          } else {
+            toast.error(debitError.message || "Could not debit balance");
+          }
+          setLoading(false);
+          return;
+        }
+
+        // Create link as active immediately
         const { data: link, error: linkError } = await supabase
           .from("links")
           .insert({
@@ -271,16 +289,12 @@ const CreateLinkModal = ({ open, onOpenChange, initialUrl = "" }: CreateLinkModa
           .select()
           .single();
 
-        if (linkError) throw linkError;
-
-        // Deduct balance from user_funds
-        const newBalance = userBalance - price;
-        const { error: balanceError } = await supabase
-          .from("user_funds")
-          .update({ balance: newBalance, updated_at: new Date().toISOString() })
-          .eq("user_id", user.id);
-
-        if (balanceError) throw balanceError;
+        if (linkError) {
+          console.error("Link insert failed after balance debit", linkError);
+          toast.error("Link creation failed after debit. Contact support with this error.");
+          await fetchUserBalance();
+          throw linkError;
+        }
 
         // Create a payment record for tracking (marked as confirmed)
         await supabase
@@ -296,9 +310,9 @@ const CreateLinkModal = ({ open, onOpenChange, initialUrl = "" }: CreateLinkModa
           });
 
         setLinkData({ shortCode, paymentId: link.id });
-        setUserBalance(newBalance);
+        setUserBalance(Number(newBalance) || 0);
         setStep("success");
-        toast.success("Link created successfully using your balance!");
+        toast.success(`Link created! $${price} debited. New balance: $${Number(newBalance).toFixed(2)}`);
       } else {
         // Create the link with pending payment status
         const { data: link, error: linkError } = await supabase
@@ -349,7 +363,15 @@ const CreateLinkModal = ({ open, onOpenChange, initialUrl = "" }: CreateLinkModa
 
     setLoading(true);
     try {
-      // Get payment details first
+      // Save optional transaction hash to the payment record
+      if (txHash.trim()) {
+        await supabase
+          .from("payments")
+          .update({ transaction_hash: txHash.trim() })
+          .eq("id", linkData.paymentId);
+      }
+
+      // Get payment details (with any hash we just saved)
       const { data: payment } = await supabase
         .from("payments")
         .select("*")
@@ -414,7 +436,9 @@ const CreateLinkModal = ({ open, onOpenChange, initialUrl = "" }: CreateLinkModa
     setShowDomainInstructions(false);
     setNewCustomDomain("");
     setUseBalance(false);
+    setTxHash("");
   };
+
 
   const handleClose = (open: boolean) => {
     if (!open) resetModal();
@@ -761,6 +785,19 @@ const CreateLinkModal = ({ open, onOpenChange, initialUrl = "" }: CreateLinkModa
                   )}
                 </Button>
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="tx-hash">
+                Transaction Hash <span className="text-muted-foreground font-normal">(optional)</span>
+              </Label>
+              <Input
+                id="tx-hash"
+                placeholder="Paste your tx hash to speed up verification"
+                value={txHash}
+                onChange={(e) => setTxHash(e.target.value)}
+                className="bg-input border-border font-mono text-xs"
+              />
             </div>
 
             <div className="p-3 bg-muted rounded-lg text-sm text-muted-foreground">
