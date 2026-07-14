@@ -787,6 +787,19 @@ const CreateLinkModal = ({ open, onOpenChange, initialUrl = "" }: CreateLinkModa
               </div>
             </div>
 
+            <div className="space-y-2">
+              <Label htmlFor="tx-hash">
+                Transaction Hash <span className="text-muted-foreground font-normal">(optional)</span>
+              </Label>
+              <Input
+                id="tx-hash"
+                placeholder="Paste your tx hash to speed up verification"
+                value={txHash}
+                onChange={(e) => setTxHash(e.target.value)}
+                className="bg-input border-border font-mono text-xs"
+              />
+            </div>
+
             <div className="p-3 bg-muted rounded-lg text-sm text-muted-foreground">
               After sending, click the button below to confirm your payment. 
               Your link will be activated once verified by admin.
