@@ -34,9 +34,13 @@ const Navbar = () => {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2 group">
-            <div className="w-9 h-9 rounded-lg bg-primary flex items-center justify-center shadow-[0_0_20px_hsl(174_72%_56%/0.3)] group-hover:shadow-[0_0_30px_hsl(174_72%_56%/0.5)] transition-all duration-300">
-              <Link2 className="w-5 h-5 text-primary-foreground" />
-            </div>
+            <img
+              src="/favicon.png"
+              alt="CustomsLinks logo"
+              width={36}
+              height={36}
+              className="w-9 h-9 rounded-lg shadow-[0_0_20px_hsl(174_72%_56%/0.3)] group-hover:shadow-[0_0_30px_hsl(174_72%_56%/0.5)] transition-all duration-300"
+            />
             <span className="font-heading font-bold text-xl text-foreground">
               CustomsLinks
             </span>
