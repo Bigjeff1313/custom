@@ -290,10 +290,9 @@ const CreateLinkModal = ({ open, onOpenChange, initialUrl = "" }: CreateLinkModa
           .single();
 
         if (linkError) {
-          // Best-effort refund if link creation failed after debit
-          try {
-            await supabase.rpc("debit_user_balance", { _amount: -price });
-          } catch {}
+          console.error("Link insert failed after balance debit", linkError);
+          toast.error("Link creation failed after debit. Contact support with this error.");
+          await fetchUserBalance();
           throw linkError;
         }
 
