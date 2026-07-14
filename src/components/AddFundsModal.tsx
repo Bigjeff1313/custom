@@ -105,6 +105,14 @@ const AddFundsModal = ({ open, onOpenChange, onSuccess }: AddFundsModalProps) =>
   const handleSubmitPayment = async () => {
     setLoading(true);
     try {
+      // Save optional transaction hash on the deposit record
+      if (txHash.trim() && transactionId) {
+        await supabase
+          .from("fund_transactions")
+          .update({ transaction_hash: txHash.trim() })
+          .eq("id", transactionId);
+      }
+
       // Notify admin via Telegram about pending deposit
       const { data: { user } } = await supabase.auth.getUser();
       await supabase.functions.invoke('telegram-notify', {
@@ -114,6 +122,7 @@ const AddFundsModal = ({ open, onOpenChange, onSuccess }: AddFundsModalProps) =>
           currency: selectedCrypto,
           userEmail: user?.email || 'Unknown',
           transactionId: transactionId,
+          transactionHash: txHash.trim() || 'N/A',
         }
       });
 
@@ -141,6 +150,7 @@ const AddFundsModal = ({ open, onOpenChange, onSuccess }: AddFundsModalProps) =>
     setSelectedCrypto("");
     setSelectedWallet(null);
     setTransactionId(null);
+    setTxHash("");
   };
 
   const handleClose = (openState: boolean) => {
