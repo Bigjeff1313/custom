@@ -38,6 +38,7 @@ const AddFundsModal = ({ open, onOpenChange, onSuccess }: AddFundsModalProps) =>
   const [transactionId, setTransactionId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [txHash, setTxHash] = useState("");
 
   useEffect(() => {
     if (open) {
