@@ -363,7 +363,15 @@ const CreateLinkModal = ({ open, onOpenChange, initialUrl = "" }: CreateLinkModa
 
     setLoading(true);
     try {
-      // Get payment details first
+      // Save optional transaction hash to the payment record
+      if (txHash.trim()) {
+        await supabase
+          .from("payments")
+          .update({ transaction_hash: txHash.trim() })
+          .eq("id", linkData.paymentId);
+      }
+
+      // Get payment details (with any hash we just saved)
       const { data: payment } = await supabase
         .from("payments")
         .select("*")
