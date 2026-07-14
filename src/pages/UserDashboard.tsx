@@ -75,6 +75,32 @@ const UserDashboard = () => {
     checkAuth();
   }, []);
 
+  // Real-time subscription for links
+  useEffect(() => {
+    if (!user) return;
+    const channel = supabase
+      .channel(`user-links-${user.id}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "links", filter: `user_id=eq.${user.id}` },
+        () => fetchLinks(user.id)
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "user_funds", filter: `user_id=eq.${user.id}` },
+        () => fetchUserBalance(user.id)
+      )
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "link_clicks" },
+        () => fetchLinks(user.id)
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
+
   const checkAuth = async () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
