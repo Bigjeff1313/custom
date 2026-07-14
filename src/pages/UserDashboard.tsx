@@ -187,6 +187,17 @@ const UserDashboard = () => {
     if (user) fetchLinks(user.id);
   };
 
+  const handleDeleteLink = async (link: Link) => {
+    if (!confirm(`Delete ${link.custom_domain}/${link.short_code}? This cannot be undone.`)) return;
+    const { error } = await supabase.from("links").delete().eq("id", link.id);
+    if (error) {
+      toast.error(error.message || "Failed to delete link");
+      return;
+    }
+    toast.success("Link deleted");
+    if (user) fetchLinks(user.id);
+  };
+
   const copyToClipboard = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
     setCopied(id);
