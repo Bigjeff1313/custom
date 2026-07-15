@@ -33,9 +33,19 @@ serve(async (req) => {
         status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
-    const { data: isAdmin } = await userClient.rpc('has_role', {
-      _user_id: userData.user.id, _role: 'admin',
-    });
+
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      { auth: { autoRefreshToken: false, persistSession: false } }
+    );
+    const { data: adminRole } = await supabase
+      .from('user_roles')
+      .select('id')
+      .eq('user_id', userData.user.id)
+      .eq('role', 'admin')
+      .maybeSingle();
+    const isAdmin = !!adminRole;
 
     const publicAction = action === 'list' && data?.activeOnly === true;
     if (!publicAction && !isAdmin) {
@@ -43,12 +53,6 @@ serve(async (req) => {
         status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
-
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-      { auth: { autoRefreshToken: false, persistSession: false } }
-    );
 
     let result;
 
