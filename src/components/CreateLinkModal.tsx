@@ -132,13 +132,6 @@ const CreateLinkModal = ({ open, onOpenChange, initialUrl = "" }: CreateLinkModa
     if (error) toast.error("Failed to load domains");
   };
 
-  const generateShortCode = () => {
-    const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-    const bytes = new Uint8Array(6);
-    crypto.getRandomValues(bytes);
-    return Array.from(bytes, (b) => chars[b % chars.length]).join("");
-  };
-
   const isValidUrl = (url: string) => {
     try {
       new URL(url);
