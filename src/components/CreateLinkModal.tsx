@@ -258,13 +258,15 @@ const CreateLinkModal = ({ open, onOpenChange, initialUrl = "" }: CreateLinkModa
         return;
       }
 
+      const domainForCheckout = selectedPlan === "basic" ? DEFAULT_DOMAIN : selectedDomain;
+
       const { data: response, error: checkoutError } = await supabase.functions.invoke("payments-api", {
         body: {
           action: "create-link",
           data: {
             originalUrl: formattedUrl,
             customCode: customShortCode.trim() || null,
-            customDomain: selectedDomain,
+            customDomain: domainForCheckout,
             planType: selectedPlan,
             paymentMethod: useBalance ? "balance" : "crypto",
             walletCurrency: selectedCrypto || null,
@@ -279,6 +281,7 @@ const CreateLinkModal = ({ open, onOpenChange, initialUrl = "" }: CreateLinkModa
       }
 
       const checkout = response.data;
+      setSelectedDomain(domainForCheckout);
       setLinkData({
         shortCode: checkout.shortCode,
         paymentId: checkout.paymentId,
