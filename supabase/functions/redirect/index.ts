@@ -128,6 +128,19 @@ serve(async (req) => {
       });
     }
 
+    // Probe mode: just confirm existence + captcha settings without recording a click
+    if (probe) {
+      return new Response(JSON.stringify({
+        success: true,
+        captchaEnabled: link.captcha_enabled !== false,
+        analyticsEnabled: link.analytics_enabled !== false,
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+
+
     // Get IP from request headers or provided clientIP
     const ip = clientIP || 
       req.headers.get('x-forwarded-for')?.split(',')[0] || 
