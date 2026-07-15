@@ -42,6 +42,23 @@ const TransactionHistory = ({ userId }: TransactionHistoryProps) => {
   useEffect(() => {
     if (userId) {
       fetchTransactions();
+      const channel = supabase
+        .channel(`user-transactions-${userId}`)
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "fund_transactions", filter: `user_id=eq.${userId}` },
+          fetchTransactions
+        )
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "payments" },
+          fetchTransactions
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
     }
   }, [userId]);
 
