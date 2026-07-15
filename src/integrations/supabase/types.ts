@@ -299,7 +299,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      create_link_checkout: {
+      create_link_checkout_admin: {
         Args: {
           _custom_domain?: string
           _original_url: string
@@ -307,6 +307,7 @@ export type Database = {
           _plan_type?: string
           _short_code?: string
           _transaction_hash?: string
+          _user_id: string
           _wallet_address?: string
           _wallet_currency?: string
         }
@@ -319,10 +320,6 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
-      }
-      submit_link_payment_hash: {
-        Args: { _payment_id: string; _transaction_hash?: string }
-        Returns: Json
       }
     }
     Enums: {
