@@ -69,7 +69,7 @@ serve(async (req) => {
   }
 
   try {
-    const { shortCode, domain, userAgent, clientIP } = await req.json();
+    const { shortCode, domain, userAgent, clientIP, probe } = await req.json();
     
     console.log(`Redirect request: shortCode=${shortCode}, domain=${domain}`);
 
@@ -127,6 +127,19 @@ serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+
+    // Probe mode: just confirm existence + captcha settings without recording a click
+    if (probe) {
+      return new Response(JSON.stringify({
+        success: true,
+        captchaEnabled: link.captcha_enabled !== false,
+        analyticsEnabled: link.analytics_enabled !== false,
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+
 
     // Get IP from request headers or provided clientIP
     const ip = clientIP || 
