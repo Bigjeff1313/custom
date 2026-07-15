@@ -69,7 +69,7 @@ serve(async (req) => {
   }
 
   try {
-    const { shortCode, domain, userAgent, clientIP } = await req.json();
+    const { shortCode, domain, userAgent, clientIP, probe } = await req.json();
     
     console.log(`Redirect request: shortCode=${shortCode}, domain=${domain}`);
 
