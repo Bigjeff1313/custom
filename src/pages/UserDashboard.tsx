@@ -92,6 +92,16 @@ const UserDashboard = () => {
       )
       .on(
         "postgres_changes",
+        { event: "*", schema: "public", table: "fund_transactions", filter: `user_id=eq.${user.id}` },
+        () => fetchUserBalance(user.id)
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "payments" },
+        () => fetchLinks(user.id)
+      )
+      .on(
+        "postgres_changes",
         { event: "INSERT", schema: "public", table: "link_clicks" },
         () => fetchLinks(user.id)
       )

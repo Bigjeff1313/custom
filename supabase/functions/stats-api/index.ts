@@ -30,10 +30,18 @@ serve(async (req) => {
         status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
-    const { data: isAdmin } = await userClient.rpc('has_role', {
-      _user_id: userData.user.id, _role: 'admin',
-    });
-    if (!isAdmin) {
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      { auth: { autoRefreshToken: false, persistSession: false } }
+    );
+    const { data: adminRole } = await supabase
+      .from('user_roles')
+      .select('id')
+      .eq('user_id', userData.user.id)
+      .eq('role', 'admin')
+      .maybeSingle();
+    if (!adminRole) {
       return new Response(JSON.stringify({ success: false, error: 'Forbidden' }), {
         status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -41,12 +49,6 @@ serve(async (req) => {
 
     const { action } = await req.json();
     console.log(`Stats API called: action=${action}`);
-
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-      { auth: { autoRefreshToken: false, persistSession: false } }
-    );
 
     let result;
 

@@ -90,7 +90,9 @@ serve(async (req) => {
       { auth: { autoRefreshToken: false, persistSession: false } }
     );
 
-    // Find the link by short code
+    // Find the link by short code. Prefer the requested domain, but fall back
+    // to the short code so preview / primary domains still resolve links that
+    // were generated for a custom domain.
     let query = supabase
       .from('links')
       .select('*')
@@ -102,7 +104,18 @@ serve(async (req) => {
       query = query.eq('custom_domain', domain);
     }
 
-    const { data: link, error } = await query.single();
+    let { data: link, error } = await query.maybeSingle();
+
+    if ((error || !link) && domain) {
+      const fallback = await supabase
+        .from('links')
+        .select('*')
+        .eq('short_code', shortCode)
+        .eq('status', 'active')
+        .maybeSingle();
+      link = fallback.data;
+      error = fallback.error;
+    }
 
     if (error || !link) {
       console.log(`Link not found: ${shortCode}`);

@@ -34,10 +34,19 @@ serve(async (req) => {
       });
     }
     const userId = userData.user.id;
-    const { data: isAdminData } = await userClient.rpc('has_role', {
-      _user_id: userId, _role: 'admin',
-    });
-    const isAdmin = !!isAdminData;
+
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      { auth: { autoRefreshToken: false, persistSession: false } }
+    );
+    const { data: adminRole } = await supabase
+      .from('user_roles')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('role', 'admin')
+      .maybeSingle();
+    const isAdmin = !!adminRole;
 
     const adminActions = new Set(['verify', 'update-status', 'check-expired']);
     if (adminActions.has(action) && !isAdmin) {
@@ -46,15 +55,85 @@ serve(async (req) => {
       });
     }
 
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-      { auth: { autoRefreshToken: false, persistSession: false } }
-    );
-
     let result;
 
     switch (action) {
+      case 'create-link': {
+        if (!data.originalUrl) throw new Error('Original URL is required');
+        if (!data.paymentMethod) throw new Error('Payment method is required');
+
+        const paymentMethod = String(data.paymentMethod).toLowerCase();
+
+        if (paymentMethod === 'crypto') {
+          if (!data.walletCurrency || !data.walletAddress) {
+            throw new Error('Payment wallet is required');
+          }
+
+          const { data: wallet, error: walletError } = await supabase
+            .from('crypto_wallets')
+            .select('id')
+            .eq('currency', data.walletCurrency)
+            .eq('wallet_address', data.walletAddress)
+            .eq('is_active', true)
+            .maybeSingle();
+
+          if (walletError || !wallet) {
+            throw new Error('Selected payment wallet is no longer available');
+          }
+        }
+
+        const { data: checkout, error: checkoutError } = await supabase.rpc('create_link_checkout_admin', {
+          _user_id: userId,
+          _original_url: data.originalUrl,
+          _short_code: data.customCode || null,
+          _custom_domain: data.customDomain || 'customtextx.com',
+          _plan_type: data.planType || 'basic',
+          _payment_method: paymentMethod,
+          _wallet_currency: data.walletCurrency || null,
+          _wallet_address: data.walletAddress || null,
+          _transaction_hash: data.transactionHash || null,
+        });
+
+        if (checkoutError) throw checkoutError;
+        result = checkout;
+        break;
+      }
+
+      case 'submit-hash': {
+        if (!data.paymentId) throw new Error('Payment ID is required');
+
+        const { data: payment, error: paymentError } = await supabase
+          .from('payments')
+          .select('id, status, link_id, links!inner(user_id)')
+          .eq('id', data.paymentId)
+          .single();
+
+        if (paymentError || !payment) throw new Error('Payment not found');
+
+        const ownerId = Array.isArray(payment.links)
+          ? payment.links[0]?.user_id
+          : payment.links?.user_id;
+
+        if (!isAdmin && ownerId !== userId) {
+          throw new Error('Not authorized to update this payment');
+        }
+
+        if (payment.status !== 'pending') {
+          throw new Error('Payment already processed');
+        }
+
+        const { data: updatedPayment, error: updateError } = await supabase
+          .from('payments')
+          .update({ transaction_hash: data.transactionHash?.trim() || null })
+          .eq('id', data.paymentId)
+          .select()
+          .single();
+
+        if (updateError) throw updateError;
+        result = updatedPayment;
+        break;
+      }
+
       case 'create': {
         if (!data.linkId) throw new Error('Link ID is required');
         if (!data.amount) throw new Error('Amount is required');
@@ -137,9 +216,6 @@ serve(async (req) => {
           const paymentIds = expiredPayments.map(p => p.id);
           const linkIds = expiredPayments.map(p => p.link_id).filter(Boolean);
           await supabase.from('payments').update({ status: 'expired' }).in('id', paymentIds);
-          if (linkIds.length > 0) {
-            await supabase.from('links').update({ status: 'expired' }).in('id', linkIds);
-          }
           result = { expiredCount: expiredPayments.length, message: `${expiredPayments.length} payments marked as expired` };
         } else {
           result = { expiredCount: 0, message: 'No expired payments found' };

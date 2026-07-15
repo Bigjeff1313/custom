@@ -10,7 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Copy, Check, Loader2, Clock, Wallet, Globe, AlertCircle, Plus, Settings, QrCode, Download, Send, CreditCard } from "lucide-react";
+import { Copy, Check, Loader2, Clock, Wallet, Globe, AlertCircle, Plus, Settings, QrCode, Download, Send, CreditCard, CheckCircle2 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { supabase } from "@/integrations/supabase/client";
 import { notifySupport } from "@/lib/support";
@@ -53,7 +53,7 @@ const CreateLinkModal = ({ open, onOpenChange, initialUrl = "" }: CreateLinkModa
   const [domains, setDomains] = useState<CustomDomain[]>([]);
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [linkData, setLinkData] = useState<{ shortCode: string; paymentId: string } | null>(null);
+  const [linkData, setLinkData] = useState<{ shortCode: string; paymentId: string; status: "active" | "pending_payment" } | null>(null);
   const [selectedWallet, setSelectedWallet] = useState<CryptoWallet | null>(null);
   const [timeLeft, setTimeLeft] = useState(900); // 15 minutes
   const [showDomainInstructions, setShowDomainInstructions] = useState(false);
@@ -130,13 +130,6 @@ const CreateLinkModal = ({ open, onOpenChange, initialUrl = "" }: CreateLinkModa
       }
     }
     if (error) toast.error("Failed to load domains");
-  };
-
-  const generateShortCode = () => {
-    const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-    const bytes = new Uint8Array(6);
-    crypto.getRandomValues(bytes);
-    return Array.from(bytes, (b) => chars[b % chars.length]).join("");
   };
 
   const isValidUrl = (url: string) => {
@@ -251,102 +244,48 @@ const CreateLinkModal = ({ open, onOpenChange, initialUrl = "" }: CreateLinkModa
     setLoading(true);
 
     try {
-      const shortCode = customShortCode.trim() || generateShortCode();
-      const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
-
-      // Get user id
       const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error("Please log in before creating a link");
+        setLoading(false);
+        return;
+      }
 
-      if (useBalance && user) {
-        // Atomically debit balance server-side BEFORE creating the link.
-        const { data: newBalance, error: debitError } = await supabase.rpc(
-          "debit_user_balance",
-          { _amount: price }
-        );
+      const domainForCheckout = selectedPlan === "basic" ? DEFAULT_DOMAIN : selectedDomain;
 
-        if (debitError) {
-          if ((debitError.message || "").toLowerCase().includes("insufficient")) {
-            toast.error("Insufficient balance");
-            await fetchUserBalance();
-          } else {
-            toast.error(debitError.message || "Could not debit balance");
-          }
-          setLoading(false);
-          return;
-        }
+      const { data: response, error: checkoutError } = await supabase.functions.invoke("payments-api", {
+        body: {
+          action: "create-link",
+          data: {
+            originalUrl: formattedUrl,
+            customCode: customShortCode.trim() || null,
+            customDomain: domainForCheckout,
+            planType: selectedPlan,
+            paymentMethod: useBalance ? "balance" : "crypto",
+            walletCurrency: selectedCrypto || null,
+            walletAddress: selectedWallet?.wallet_address || null,
+          },
+        },
+      });
 
-        // Create link as active immediately
-        const { data: link, error: linkError } = await supabase
-          .from("links")
-          .insert({
-            original_url: formattedUrl,
-            short_code: shortCode,
-            custom_domain: selectedDomain,
-            plan_type: selectedPlan,
-            status: "active",
-            user_id: user.id,
-          })
-          .select()
-          .single();
+      if (checkoutError) throw checkoutError;
+      if (!response?.success || !response?.data) {
+        throw new Error(response?.error || "Failed to create link");
+      }
 
-        if (linkError) {
-          console.error("Link insert failed after balance debit", linkError);
-          toast.error("Link creation failed after debit. Contact support with this error.");
-          await fetchUserBalance();
-          throw linkError;
-        }
+      const checkout = response.data;
+      setSelectedDomain(domainForCheckout);
+      setLinkData({
+        shortCode: checkout.shortCode,
+        paymentId: checkout.paymentId,
+        status: checkout.status,
+      });
 
-        // Create a payment record for tracking (marked as confirmed)
-        await supabase
-          .from("payments")
-          .insert({
-            link_id: link.id,
-            amount: price,
-            currency: "BALANCE",
-            wallet_address: "user_balance",
-            status: "confirmed",
-            expires_at: expiresAt,
-            transaction_hash: `balance_${Date.now()}`,
-          });
-
-        setLinkData({ shortCode, paymentId: link.id });
-        setUserBalance(Number(newBalance) || 0);
+      if (checkout.status === "active") {
+        setUserBalance(Number(checkout.newBalance) || 0);
         setStep("success");
-        toast.success(`Link created! $${price} debited. New balance: $${Number(newBalance).toFixed(2)}`);
+        toast.success(`Link created! $${price} debited. New balance: $${Number(checkout.newBalance).toFixed(2)}`);
       } else {
-        // Create the link with pending payment status
-        const { data: link, error: linkError } = await supabase
-          .from("links")
-          .insert({
-            original_url: formattedUrl,
-            short_code: shortCode,
-            custom_domain: selectedDomain,
-            plan_type: selectedPlan,
-            status: "pending_payment",
-            user_id: user?.id || null,
-          })
-          .select()
-          .single();
-
-        if (linkError) throw linkError;
-
-        // Create payment record
-        const { data: payment, error: paymentError } = await supabase
-          .from("payments")
-          .insert({
-            link_id: link.id,
-            amount: price,
-            currency: selectedCrypto,
-            wallet_address: selectedWallet!.wallet_address,
-            status: "pending",
-            expires_at: expiresAt,
-          })
-          .select()
-          .single();
-
-        if (paymentError) throw paymentError;
-
-        setLinkData({ shortCode, paymentId: payment.id });
         setStep("payment");
         setTimeLeft(900);
       }
@@ -363,20 +302,20 @@ const CreateLinkModal = ({ open, onOpenChange, initialUrl = "" }: CreateLinkModa
 
     setLoading(true);
     try {
-      // Save optional transaction hash to the payment record
-      if (txHash.trim()) {
-        await supabase
-          .from("payments")
-          .update({ transaction_hash: txHash.trim() })
-          .eq("id", linkData.paymentId);
-      }
+      const { data: response, error: hashError } = await supabase.functions.invoke("payments-api", {
+        body: {
+          action: "submit-hash",
+          data: {
+            paymentId: linkData.paymentId,
+            transactionHash: txHash.trim() || null,
+          },
+        },
+      });
 
-      // Get payment details (with any hash we just saved)
-      const { data: payment } = await supabase
-        .from("payments")
-        .select("*")
-        .eq("id", linkData.paymentId)
-        .single();
+      if (hashError) throw hashError;
+      if (!response?.success) throw new Error(response?.error || "Failed to submit payment");
+
+      const payment = response.data;
 
       // NOTE: Payment stays pending, link stays pending_payment
       // Admin must confirm the payment to activate the link
@@ -461,7 +400,7 @@ const CreateLinkModal = ({ open, onOpenChange, initialUrl = "" }: CreateLinkModa
           <DialogTitle className="font-heading text-xl">
             {step === "input" && "Create New Link"}
             {step === "payment" && "Complete Payment"}
-            {step === "success" && "Link Created!"}
+            {step === "success" && (linkData?.status === "active" ? "Link Created!" : "Payment Submitted")}
           </DialogTitle>
         </DialogHeader>
 
@@ -836,14 +775,22 @@ const CreateLinkModal = ({ open, onOpenChange, initialUrl = "" }: CreateLinkModa
 
         {step === "success" && (
           <div className="space-y-4 text-center">
-            <div className="w-16 h-16 mx-auto bg-amber-500/20 rounded-full flex items-center justify-center">
-              <Clock className="w-8 h-8 text-amber-500" />
+            <div className={`w-16 h-16 mx-auto rounded-full flex items-center justify-center ${linkData?.status === "active" ? "bg-green-500/20" : "bg-amber-500/20"}`}>
+              {linkData?.status === "active" ? (
+                <CheckCircle2 className="w-8 h-8 text-green-500" />
+              ) : (
+                <Clock className="w-8 h-8 text-amber-500" />
+              )}
             </div>
 
             <div>
-              <h3 className="font-semibold text-foreground">Payment Submitted!</h3>
+              <h3 className="font-semibold text-foreground">
+                {linkData?.status === "active" ? "Your link is active" : "Payment Submitted!"}
+              </h3>
               <p className="text-sm text-muted-foreground mt-2">
-                Your payment is awaiting admin confirmation. Your link will be activated once the payment is verified.
+                {linkData?.status === "active"
+                  ? "Your balance was charged and the shortened link is ready to use now."
+                  : "Your payment is awaiting admin confirmation. Your link will be activated once the payment is verified."}
               </p>
             </div>
 

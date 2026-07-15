@@ -33,6 +33,12 @@ serve(async (req) => {
     let userId: string | null = null;
     let isAdmin = false;
 
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      { auth: { autoRefreshToken: false, persistSession: false } }
+    );
+
     if (!isPublic) {
       const authHeader = req.headers.get('Authorization');
       if (!authHeader?.startsWith('Bearer ')) {
@@ -52,10 +58,13 @@ serve(async (req) => {
         });
       }
       userId = userData.user.id;
-      const { data: roleData } = await userClient.rpc('has_role', {
-        _user_id: userId, _role: 'admin',
-      });
-      isAdmin = !!roleData;
+      const { data: adminRole } = await supabase
+        .from('user_roles')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('role', 'admin')
+        .maybeSingle();
+      isAdmin = !!adminRole;
 
       // Admin-only actions
       const adminActions = new Set(['list', 'update', 'delete', 'activate']);
@@ -65,12 +74,6 @@ serve(async (req) => {
         });
       }
     }
-
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-      { auth: { autoRefreshToken: false, persistSession: false } }
-    );
 
     let result;
 

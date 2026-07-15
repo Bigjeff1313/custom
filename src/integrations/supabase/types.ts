@@ -299,6 +299,20 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      create_link_checkout_admin: {
+        Args: {
+          _custom_domain?: string
+          _original_url: string
+          _payment_method?: string
+          _plan_type?: string
+          _short_code?: string
+          _transaction_hash?: string
+          _user_id: string
+          _wallet_address?: string
+          _wallet_currency?: string
+        }
+        Returns: Json
+      }
       debit_user_balance: { Args: { _amount: number }; Returns: number }
       has_role: {
         Args: {
