@@ -129,7 +129,7 @@ const AdminDashboard = () => {
   const [newWallet, setNewWallet] = useState({ currency: "", wallet_address: "" });
   const [newDomain, setNewDomain] = useState("");
   const [newUser, setNewUser] = useState({ email: "", password: "", role: "user" as AppRole });
-  const [newLink, setNewLink] = useState({ original_url: "", custom_domain: "customtextx.com", short_code: "", user_id: "" });
+  const [newLink, setNewLink] = useState({ original_url: "", custom_domain: "customslinksurl.com", short_code: "", user_id: "" });
   const [copied, setCopied] = useState<string | null>(null);
   const navigate = useNavigate();
 
@@ -381,7 +381,7 @@ const AdminDashboard = () => {
     }
 
     toast.success("Link created successfully!");
-    setNewLink({ original_url: "", custom_domain: "customtextx.com", short_code: "", user_id: "" });
+    setNewLink({ original_url: "", custom_domain: "customslinksurl.com", short_code: "", user_id: "" });
     setLinkDialogOpen(false);
     fetchLinks();
   };

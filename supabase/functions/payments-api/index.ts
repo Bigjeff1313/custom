@@ -86,7 +86,7 @@ serve(async (req) => {
           _user_id: userId,
           _original_url: data.originalUrl,
           _short_code: data.customCode || null,
-          _custom_domain: data.customDomain || 'customtextx.com',
+          _custom_domain: data.customDomain || 'customslinksurl.com',
           _plan_type: data.planType || 'basic',
           _payment_method: paymentMethod,
           _wallet_currency: data.walletCurrency || null,

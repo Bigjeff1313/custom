@@ -52,7 +52,7 @@ const CustomDomainSection = () => {
               <div className="space-y-3">
                 <div className="flex items-center gap-3 p-4 rounded-xl bg-secondary/50">
                   <div className="w-3 h-3 rounded-full bg-primary" />
-                  <span className="font-mono text-foreground">customslinks.com/abc123</span>
+                  <span className="font-mono text-foreground">customslinksurl.com/abc123</span>
                   <span className="ml-auto text-xs text-muted-foreground">Default</span>
                 </div>
                 

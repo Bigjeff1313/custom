@@ -100,7 +100,7 @@ serve(async (req) => {
             user_id: userId,
             original_url: data.originalUrl,
             short_code: shortCode,
-            custom_domain: data.customDomain || 'customslinks.com',
+            custom_domain: data.customDomain || 'customslinksurl.com',
             plan_type: data.planType || 'basic',
             status: 'pending_payment',
           })
