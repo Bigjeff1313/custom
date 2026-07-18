@@ -147,7 +147,7 @@ const Footer = () => {
               Contact Admin
             </a>
             <p className="text-sm text-muted-foreground">
-              Default domain: customslinks.com
+              Default domain: customslinksurl.com
             </p>
           </div>
         </div>

@@ -10,7 +10,7 @@ const pricingPlans = [
     description: "Perfect for single links",
     features: [
       "1 shortened link",
-      "Default customslinks.com domain",
+      "Default customslinksurl.com domain",
       "Basic click analytics",
       "Lifetime link validity",
       "SSL encryption",
