@@ -1,0 +1,2 @@
+REVOKE ALL ON FUNCTION public.create_link_checkout_admin(uuid, text, text, text, text, text, numeric, text) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.create_link_checkout_admin(uuid, text, text, text, text, text, numeric, text) TO service_role;
