@@ -1,0 +1,1 @@
+ALTER TABLE public.custom_domains DROP CONSTRAINT IF EXISTS custom_domains_owner_or_public;
