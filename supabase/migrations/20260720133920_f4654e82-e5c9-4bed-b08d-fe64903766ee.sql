@@ -1,0 +1,1 @@
+UPDATE public.custom_domains SET user_id = NULL, is_active = true, is_verified = true WHERE domain = 'customslinksurl.com';
