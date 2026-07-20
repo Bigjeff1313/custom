@@ -473,19 +473,27 @@ const AdminDashboard = () => {
       return;
     }
 
-    const cleanDomain = newDomain.replace(/^(https?:\/\/)?/, '').replace(/\/$/, '');
+    const cleanDomain = newDomain.replace(/^(https?:\/\/)?/, '').replace(/\/$/, '').toLowerCase();
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      toast.error("Not authenticated");
+      return;
+    }
 
     const { error } = await supabase.from("custom_domains").insert({
       domain: cleanDomain,
-      is_verified: false,
+      is_verified: true,
       is_active: true,
+      user_id: user.id,
     });
 
     if (error) {
       if (error.code === '23505') {
         toast.error("Domain already exists");
       } else {
-        toast.error("Failed to add domain");
+        console.error(error);
+        toast.error(error.message || "Failed to add domain");
       }
       return;
     }
