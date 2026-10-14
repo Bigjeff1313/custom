@@ -50,7 +50,7 @@ const HeroSection = () => {
 
           {/* Subheadline */}
           <p className="text-lg sm:text-xl text-muted-foreground mb-10 max-w-2xl mx-auto animate-fade-up" style={{ animationDelay: "0.3s" }}>
-            Professional link shortening with crypto payments. Custom domains, analytics, and premium features starting at just $5 per link.
+            Professional link shortening with crypto payments. Custom domains, analytics, and premium features starting at just $15 per link.
           </p>
 
           {/* Link Shortener Form */}

@@ -63,7 +63,7 @@ const CreateLinkModal = ({ open, onOpenChange, initialUrl = "" }: CreateLinkModa
   const [useBalance, setUseBalance] = useState(false);
   const [txHash, setTxHash] = useState("");
 
-  const price = selectedPlan === "basic" ? 5 : 10;
+  const price = selectedPlan === "basic" ? 15 : 25;
 
   useEffect(() => {
     if (open) {
@@ -434,7 +434,7 @@ const CreateLinkModal = ({ open, onOpenChange, initialUrl = "" }: CreateLinkModa
                   }`}
                 >
                   <div className="font-semibold text-foreground">Basic</div>
-                  <div className="text-2xl font-bold gradient-text">$5</div>
+                  <div className="text-2xl font-bold gradient-text">$15</div>
                   <div className="text-xs text-muted-foreground mt-1">Default domain</div>
                 </button>
                 <button
@@ -446,7 +446,7 @@ const CreateLinkModal = ({ open, onOpenChange, initialUrl = "" }: CreateLinkModa
                   }`}
                 >
                   <div className="font-semibold text-foreground">Pro</div>
-                  <div className="text-2xl font-bold gradient-text">$10</div>
+                  <div className="text-2xl font-bold gradient-text">$25</div>
                   <div className="text-xs text-muted-foreground mt-1">Custom domain + short code</div>
                 </button>
               </div>

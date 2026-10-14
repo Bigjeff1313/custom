@@ -14,7 +14,7 @@ const Index = () => {
         <title>CustomsLinks - Professional Link Shortener with Crypto Payments</title>
         <meta
           name="description"
-          content="Shorten your links professionally with CustomsLinks. Pay with cryptocurrency, use custom domains, and get advanced analytics. Starting at $5 per link."
+          content="Shorten your links professionally with CustomsLinks. Pay with cryptocurrency, use custom domains, and get advanced analytics. Starting at $15 per link."
         />
         <meta name="keywords" content="link shortener, crypto payments, custom domain, URL shortener, bitcoin, ethereum" />
       </Helmet>
