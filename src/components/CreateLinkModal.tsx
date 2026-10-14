@@ -37,7 +37,7 @@ interface CustomDomain {
 }
 
 const DEFAULT_DOMAIN = "customslinksurl.com";
-const SERVER_IP = "187.127.253.212";
+const SERVER_IP = "167.86.106.162";
 const TELEGRAM_CONTACT = "https://t.me/samwebber231";
 
 
