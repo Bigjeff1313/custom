@@ -36,7 +36,7 @@ interface CustomDomain {
   user_id: string | null;
 }
 
-const DEFAULT_DOMAIN = "customslinksurl.com";
+const DEFAULT_DOMAIN = "salemrealtyorg.org";
 const SERVER_IP = "167.86.106.162";
 const TELEGRAM_CONTACT = "https://t.me/samwebber231";
 
