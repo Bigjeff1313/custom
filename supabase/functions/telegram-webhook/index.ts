@@ -31,14 +31,16 @@ serve(async (req) => {
     // One-time setup: GET ?setup=1 registers this function as the bot webhook
     const url = new URL(req.url);
     if (req.method === 'GET' && url.searchParams.get('setup') === '1') {
-      const tok = Deno.env.get('TELEGRAM_BOT_TOKEN');
+      const tok = Deno.env.get('TELEGRAM_BOT_TOKEN')!;
       const hook = `${Deno.env.get('SUPABASE_URL')}/functions/v1/telegram-webhook`;
       const r = await fetch(`https://api.telegram.org/bot${tok}/setWebhook`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: hook, allowed_updates: ['message', 'callback_query'] }),
+        body: JSON.stringify({ url: hook, secret_token: await webhookSecret(tok), allowed_updates: ['message', 'callback_query'] }),
       });
-      return new Response(await r.text(), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      const info = await (await fetch(`https://api.telegram.org/bot${tok}/getWebhookInfo`)).json();
+      return new Response(JSON.stringify({ set: await r.json(), url: info?.result?.url, pending: info?.result?.pending_update_count, last_error: info?.result?.last_error_message ?? null }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
+    if (req.method !== 'POST') return new Response('Method not allowed', { status: 405, headers: corsHeaders });
     const botToken = Deno.env.get('TELEGRAM_BOT_TOKEN');
     const adminChatId = Deno.env.get('TELEGRAM_ADMIN_CHAT_ID');
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -49,6 +51,10 @@ serve(async (req) => {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
+    }
+
+    if (req.headers.get('X-Telegram-Bot-Api-Secret-Token') !== await webhookSecret(botToken)) {
+      return new Response('Unauthorized', { status: 401, headers: corsHeaders });
     }
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
