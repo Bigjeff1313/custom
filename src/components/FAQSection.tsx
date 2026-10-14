@@ -9,7 +9,7 @@ const faqs = [
   {
     question: "How does the payment process work?",
     answer:
-      "After shortening your link, you'll receive a crypto payment address. Send the payment ($5-10 depending on your plan) and your link will be activated within minutes of blockchain confirmation.",
+      "After shortening your link, you'll receive a crypto payment address. Send the payment ($15-25 depending on your plan) and your link will be activated within minutes of blockchain confirmation.",
   },
   {
     question: "Which cryptocurrencies do you accept?",
@@ -19,7 +19,7 @@ const faqs = [
   {
     question: "How do I add my custom domain?",
     answer:
-      "Choose the Pro Link plan ($10), then add your domain through your dashboard. You'll need to update your DNS settings to point to our servers. We provide step-by-step instructions and support throughout the process.",
+      "Choose the Pro Link plan ($25), then add your domain through your dashboard. You'll need to update your DNS settings to point to our servers. We provide step-by-step instructions and support throughout the process.",
   },
   {
     question: "Is there a link expiration?",

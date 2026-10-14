@@ -6,7 +6,7 @@ import CreateLinkModal from "./CreateLinkModal";
 const pricingPlans = [
   {
     name: "Basic Link",
-    price: "$5",
+    price: "$15",
     description: "Perfect for single links",
     features: [
       "1 shortened link",
@@ -19,7 +19,7 @@ const pricingPlans = [
   },
   {
     name: "Pro Link",
-    price: "$10",
+    price: "$25",
     description: "For branded experiences",
     features: [
       "1 shortened link",
