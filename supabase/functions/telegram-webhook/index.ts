@@ -28,6 +28,17 @@ serve(async (req) => {
   }
 
   try {
+    // One-time setup: GET ?setup=1 registers this function as the bot webhook
+    const url = new URL(req.url);
+    if (req.method === 'GET' && url.searchParams.get('setup') === '1') {
+      const tok = Deno.env.get('TELEGRAM_BOT_TOKEN');
+      const hook = `${Deno.env.get('SUPABASE_URL')}/functions/v1/telegram-webhook`;
+      const r = await fetch(`https://api.telegram.org/bot${tok}/setWebhook`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: hook, allowed_updates: ['message', 'callback_query'] }),
+      });
+      return new Response(await r.text(), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
     const botToken = Deno.env.get('TELEGRAM_BOT_TOKEN');
     const adminChatId = Deno.env.get('TELEGRAM_ADMIN_CHAT_ID');
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -58,6 +69,22 @@ serve(async (req) => {
         return new Response(JSON.stringify({ ok: true }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
+      }
+
+      // Handle user approval / rejection
+      if (callbackData.startsWith('approve_user_') || callbackData.startsWith('reject_user_')) {
+        const approve = callbackData.startsWith('approve_user_');
+        const uid = callbackData.replace(approve ? 'approve_user_' : 'reject_user_', '');
+        const { error } = await supabase.from('user_approvals')
+          .update({ status: approve ? 'approved' : 'rejected', updated_at: new Date().toISOString() })
+          .eq('user_id', uid);
+        if (error) {
+          await answerCallback(botToken, callbackId, '❌ Failed to update user', true);
+        } else {
+          await editMessage(botToken, chatId, messageId,
+            (update.callback_query.message.text || 'User') + (approve ? '\n\n✅ Approved by admin' : '\n\n❌ Rejected by admin'));
+          await answerCallback(botToken, callbackId, approve ? '✅ User approved' : '❌ User rejected', false);
+        }
       }
 
       // Handle payment confirmation
@@ -206,6 +233,7 @@ serve(async (req) => {
           '/stats - View dashboard stats\n' +
           '/pending - View pending payments\n' +
           '/deposits - View pending deposits\n' +
+          '/users - Approve new users\n' +
           '/links - View recent links\n' +
           '/help - Show this message',
           'Markdown'
@@ -282,6 +310,19 @@ serve(async (req) => {
           };
 
           await sendMessage(botToken, chatId, msg, 'Markdown', keyboard);
+        }
+      } else if (text === '/users') {
+        const { data: users } = await supabase.from('user_approvals')
+          .select('user_id, email').eq('status', 'pending').order('created_at', { ascending: false }).limit(10);
+        if (!users || users.length === 0) {
+          await sendMessage(botToken, chatId, '✅ No users awaiting approval');
+        } else {
+          await sendMessage(botToken, chatId, '🆕 Users awaiting approval:', undefined, {
+            inline_keyboard: users.map(u => [
+              { text: `✅ ${u.email}`, callback_data: `approve_user_${u.user_id}` },
+              { text: '❌', callback_data: `reject_user_${u.user_id}` },
+            ]),
+          });
         }
       } else if (text === '/links') {
         const { data: links } = await supabase
