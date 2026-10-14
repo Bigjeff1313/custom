@@ -4,7 +4,7 @@ set -euo pipefail
 # Pull the latest code from GitHub, build, and reload Nginx.
 # Configure your repo URL either here or in /root/.customtextx-env
 
-APP_DIR="${APP_DIR:-/var/www/customslinksurl}"
+APP_DIR="${APP_DIR:-/var/www/salemrealtyorg}"
 BRANCH="${BRANCH:-main}"
 LOG_FILE="${LOG_FILE:-/var/log/customtextx-deploy.log}"
 ENV_FILE="/root/.customtextx-env"
@@ -20,7 +20,7 @@ echo "=== $(date '+%Y-%m-%d %H:%M:%S') ==="
 
 if [ -z "$REPO_URL" ]; then
   echo "ERROR: Set REPO_URL in /root/.customtextx-env or pass GITHUB_REPO_URL. Example:"
-  echo "REPO_URL=https://github.com/youruser/customslinksurl.git"
+  echo "REPO_URL=https://github.com/youruser/salemrealtyorg.git"
   exit 1
 fi
 
