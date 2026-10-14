@@ -86,7 +86,10 @@ const Auth = () => {
           },
         });
         if (error) throw error;
-        toast.success("Account created successfully!");
+        supabase.functions
+          .invoke("telegram-notify", { body: { type: "new_user", userEmail: email.trim().toLowerCase() } })
+          .catch(() => {});
+        toast.success("Account created! It will be available once an administrator approves it.");
       }
     } catch (error: any) {
       if (error.message === "User already registered") {

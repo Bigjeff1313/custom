@@ -69,6 +69,7 @@ const UserDashboard = () => {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [addFundsOpen, setAddFundsOpen] = useState(false);
   const [userBalance, setUserBalance] = useState(0);
+  const [approvalStatus, setApprovalStatus] = useState<string>("approved");
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -130,6 +131,18 @@ const UserDashboard = () => {
 
     if (roleData) {
       navigate("/admin");
+      return;
+    }
+
+    const { data: approval } = await supabase
+      .from("user_approvals")
+      .select("status")
+      .eq("user_id", session.user.id)
+      .maybeSingle();
+    const status = approval?.status ?? "pending";
+    setApprovalStatus(status);
+    if (status !== "approved") {
+      setLoading(false);
       return;
     }
 
