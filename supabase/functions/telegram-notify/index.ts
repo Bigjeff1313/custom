@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -6,7 +7,7 @@ const corsHeaders = {
 };
 
 interface NotificationPayload {
-  type: 'domain_added' | 'payment_confirmed' | 'payment_submitted' | 'fund_deposit' | 'support_request';
+  type: 'domain_added' | 'payment_confirmed' | 'payment_submitted' | 'fund_deposit' | 'support_request' | 'new_user';
   domain?: string;
   userEmail?: string;
   amount?: number;
@@ -87,6 +88,19 @@ serve(async (req) => {
           ]]
         };
       }
+    } else if (payload.type === 'new_user') {
+      const admin = createClient(supabaseUrl!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+      const { data: row } = await admin.from('user_approvals')
+        .select('user_id, email, status').eq('email', (payload.userEmail || '').toLowerCase()).maybeSingle();
+      if (!row || row.status !== 'pending') {
+        return new Response(JSON.stringify({ success: true, skipped: true }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      message = `🆕 *New User Awaiting Approval*\n\n👤 Email: ${row.email}\n🆔 ID: \`${row.user_id}\``;
+      inlineKeyboard = { inline_keyboard: [[
+        { text: '✅ Approve User', callback_data: `approve_user_${row.user_id}` },
+        { text: '❌ Reject', callback_data: `reject_user_${row.user_id}` },
+      ]] };
     } else if (payload.type === 'support_request') {
       const extraText = payload.extra ? `\n📎 *Details:* \`${JSON.stringify(payload.extra)}\`` : '';
       message = `🆘 *Support Request / Error Report*\n\n` +
