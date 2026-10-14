@@ -281,6 +281,27 @@ const UserDashboard = () => {
     );
   }
 
+  if (approvalStatus !== "approved") {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="max-w-md w-full rounded-xl border border-border bg-card p-8 text-center space-y-4">
+          <h1 className="text-2xl font-semibold text-foreground">
+            {approvalStatus === "rejected" ? "Account not approved" : "Awaiting approval"}
+          </h1>
+          <p className="text-muted-foreground">
+            {approvalStatus === "rejected"
+              ? "Your account request was declined. Please contact support for help."
+              : "Your account has been created and is waiting for administrator approval. Please check back shortly."}
+          </p>
+          <div className="flex gap-2 justify-center">
+            <Button variant="outline" onClick={() => window.location.reload()}>Refresh</Button>
+            <Button variant="ghost" onClick={handleLogout}>Sign out</Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
