@@ -1,0 +1,13 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1792009733048,
+      "tag": "0000_default_domain_salemrealty",
+      "breakpoints": true
+    }
+  ]
+}
