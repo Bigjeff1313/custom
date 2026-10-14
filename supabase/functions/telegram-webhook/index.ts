@@ -232,6 +232,11 @@ serve(async (req) => {
         });
       }
 
+      const handled = await handleAdminCommand(supabase, botToken, chatId, text);
+      if (handled) {
+        return new Response(JSON.stringify({ ok: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+
       if (text === '/start') {
         await sendMessage(botToken, chatId, 
           '🤖 *Link Shortener Admin Bot*\n\n' +
