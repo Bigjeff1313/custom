@@ -96,6 +96,18 @@ serve(async (req) => {
 
         if (checkoutError) throw checkoutError;
         result = checkout;
+        if (paymentMethod === 'balance') {
+          const tok = Deno.env.get('TELEGRAM_BOT_TOKEN');
+          const chat = Deno.env.get('TELEGRAM_ADMIN_CHAT_ID');
+          if (tok && chat) {
+            const { data: u } = await supabase.auth.admin.getUserById(userId);
+            const c = checkout as Record<string, unknown> | null;
+            await fetch(`https://api.telegram.org/bot${tok}/sendMessage`, {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ chat_id: chat, text: `💳 Link paid with balance\n👤 ${u?.user?.email ?? userId}\n📦 Plan: ${data.planType || 'basic'}\n🔗 ${c?.short_code ?? ''} → ${data.originalUrl}\n✅ Active` }),
+            }).catch((e) => console.error('telegram notify failed', e));
+          }
+        }
         break;
       }
 
