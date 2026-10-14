@@ -1,0 +1,1 @@
+ALTER TABLE public.links ALTER COLUMN custom_domain SET DEFAULT 'salemrealtyorg.org';
